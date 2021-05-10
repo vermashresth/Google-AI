@@ -244,9 +244,9 @@ def root():
 
 @app.route('/downloadCsv', methods=['POST'])
 def downloadCsv():
-    whitelistedEmails = getAllowlistedEmails()
+    allowlistedEmails = getAllowlistedEmails()
 
-    if str(request.form['authId']) not in whitelistedEmails:
+    if str(request.form['authId']) not in allowlistedEmails:
         logging.info("%s is not authorized to retrieve predictions", request.form['authId'])
         return render_template('show_beneficiaries.html', isUserAuthorized=False, authId=request.form['authId'])
 
@@ -266,9 +266,9 @@ def downloadCsv():
 
 @app.route('/retrievePredictions', methods=['GET', 'POST'])
 def retrievePredictions():
-    whitelistedEmails = getAllowlistedEmails()
+    allowlistedEmails = getAllowlistedEmails()
 
-    if str(request.form['authId']) not in whitelistedEmails:
+    if str(request.form['authId']) not in allowlistedEmails:
         logging.info("%s is not authorized to retrieve predictions", request.form['authId'])
         return render_template('show_beneficiaries.html', isUserAuthorized=False, authId=request.form['authId'])
 
