@@ -242,28 +242,6 @@ def root():
     return render_template('index.html')
 
 
-@app.route('/downloadCsv', methods=['POST'])
-def downloadCsv():
-    allowlistedEmails = getAllowlistedEmails()
-
-    if str(request.form['authId']) not in allowlistedEmails:
-        logging.info("%s is not authorized to retrieve predictions", request.form['authId'])
-        return render_template('show_beneficiaries.html', isUserAuthorized=False, authId=request.form['authId'])
-
-    beneficiary_data = readFromPredictionsDatabase()
-
-    csv_data = []
-    csv_data.append(','.join(BENEFICIARIES_COLUMNS))
-    for index, beneficiary in enumerate(beneficiary_data):
-        csv_data.append(','.join(str(beneficiary[column]) for column in BENEFICIARIES_COLUMNS))
-
-    return Response(
-        '\n'.join(csv_data),
-        mimetype="text/csv",
-        headers={"Content-disposition":
-                 "attachment; filename=Beneficiaries.csv"})
-
-
 @app.route('/retrievePredictions', methods=['GET', 'POST'])
 def retrievePredictions():
     allowlistedEmails = getAllowlistedEmails()

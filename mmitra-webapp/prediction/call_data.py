@@ -1,4 +1,4 @@
-{"instances": instances.tolist()}import logging
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from itertools import count, repeat
