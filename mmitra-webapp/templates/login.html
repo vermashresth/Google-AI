@@ -1,0 +1,31 @@
+<!doctype html>
+<html>
+<head>
+  <title>ARMMAN Dashboard</title>
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+  <link type="text/css" rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <!-- Compiled and minified CSS -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css">
+
+  <!-- Compiled and minified JavaScript -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+
+  <meta name="google-signin-client_id" content="413038645050-src4tn8ofm2lj7eiectbah6a1v3r89i4.apps.googleusercontent.com">
+  <script src="https://apis.google.com/js/platform.js?onload=init" async defer></script>
+</head>
+<body>
+
+  <h1>Welcome to the ARMMAN AI Dashboard</h1>
+  <img class="armman-logo" src="{{ url_for('static', filename='armman-logo.jpg') }}" alt="ARMMAN logo">
+  <br>
+  <h2>In partnership with</h2>
+  <br>
+  <img class="google-logo" src="{{ url_for('static', filename='google-research-logo.png') }}" alt="Google Research logo">
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+  <img class="iitm-logo" src="{{ url_for('static', filename='iitm-logo.png') }}" alt="IITM logo">
+  <br>
+  <br>
+  <br>
+  <div class="g-signin2" data-onsuccess="onSignIn" data-theme="dark"></div>
+</body>
+</html>
