@@ -7,6 +7,7 @@ import ipdb
 from collections import OrderedDict
 # import random
 
+# UPDATE THIS CONFIG WEEKLY TO GENERATE THE PREDICTIONS
 CONFIG = {
     'top-k': 200,
     'date': '060521',
@@ -16,17 +17,10 @@ CONFIG = {
 
 np.random.seed(1)
 
-# def partition(lst, n):
-#     np.random.shuffle(lst)
-#     return [lst[i::n] for i in range(n)]
-
 df = pd.read_csv(sys.argv[1])
 rmab_list = pd.read_csv('outputs/pilot_outputs/rmab_pilot.csv')['user_id'].to_list()
 round_robin_list = pd.read_csv('outputs/pilot_outputs/round_robin_pilot.csv')['user_id'].to_list()
 control_list = pd.read_csv('outputs/pilot_outputs/control_pilot.csv')['user_id'].to_list()
-# user_ids = df['user_id'].to_list()
-
-# groups = partition(user_ids, 3)
 
 rmab_group = df[df['user_id'].isin(rmab_list)]
 rmab_group = rmab_group.sort_values('whittle_index', ascending=False)
@@ -67,7 +61,14 @@ control_list = control_group['user_id'].to_list()
 np.random.shuffle(control_list)
 write_file(control_list, 'outputs/pilot_generations/control_group_list_{}_{}.txt'.format(CONFIG['week'], CONFIG['date']))
 
-## GET FEATURE DISTRIBUTIONS
+## GET FEATURE DISTRIBUTIONS (UNCOMMENT TO GENERATE THE DISTRIBUTIONS: ONLY FOR VALIDATION)
+
+# def partition(lst, n):
+#     np.random.shuffle(lst)
+#     return [lst[i::n] for i in range(n)]
+# user_ids = df['user_id'].to_list()
+
+# groups = partition(user_ids, 3)
 
 # pilot_pd_data = pd.read_csv("feb16-mar15_data/beneficiary/ai_registration-20210216-20210315.csv", sep='\t')
 
@@ -126,5 +127,3 @@ write_file(control_list, 'outputs/pilot_generations/control_group_list_{}_{}.txt
 #     print('G1: {}'.format(OrderedDict(sorted(g1_dict.items()))))
 #     print('G2: {}'.format(OrderedDict(sorted(g2_dict.items()))))
 #     print('G3: {}'.format(OrderedDict(sorted(g3_dict.items()))))
-
-# ipdb.set_trace()
