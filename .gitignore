@@ -1,7 +1,9 @@
 *.csv
 *.txt
+!*requirements.txt
 *__pycache__
 *.DS_Store
-mmitra-rmab/feb16-mar15_data
-mmitra-rmab/may_data
-mmitra-rmab/outputs
+*feb16-mar15_data
+*may_data
+*outputs
+*policy_dump.pkl

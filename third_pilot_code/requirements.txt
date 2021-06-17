@@ -1,0 +1,11 @@
+tensorflow_cpu==2.4.1
+pandas==1.0.3
+joblib==0.15.1
+swifter==0.304
+ipdb==0.13.4
+matplotlib==3.3.2
+numpy==1.18.4
+seaborn==0.11.0
+tqdm==4.50.2
+scikit_learn==0.24.2
+tensorflow==2.5.0
