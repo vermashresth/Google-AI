@@ -116,15 +116,25 @@ def get_probability_comparison():
         transition_probabilities = transition_probabilities.append(probs, ignore_index=True)
         probs = dict()
         x = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == i ]
-        probs['P(E, I, E)'] = x['P(L, I, L)'].item()
-        probs['P(E, I, NE)'] = x['P(L, I, H)'].item()
-        probs['P(NE, I, E)'] = x['P(H, I, L)'].item()
-        probs['P(NE, I, NE)'] = x['P(H, I, H)'].item()
-        probs['P(E, A, E)'] = x['P(L, N, L)'].item()
-        probs['P(E, A, NE)'] = x['P(L, N, H)'].item()
-        probs['P(NE, A, E)'] = x['P(H, N, L)'].item()
-        probs['P(NE, A, NE)'] = x['P(H, N, H)'].item()
-        
+        try:
+            probs['P(E, I, E)'] = x['P(L, I, L)'].item()
+            probs['P(E, I, NE)'] = x['P(L, I, H)'].item()
+            probs['P(NE, I, E)'] = x['P(H, I, L)'].item()
+            probs['P(NE, I, NE)'] = x['P(H, I, H)'].item()
+            probs['P(E, A, E)'] = x['P(L, N, L)'].item()
+            probs['P(E, A, NE)'] = x['P(L, N, H)'].item()
+            probs['P(NE, A, E)'] = x['P(H, N, L)'].item()
+            probs['P(NE, A, NE)'] = x['P(H, N, H)'].item()
+        except Exception as e:
+            probs['P(E, I, E)'] = x['P(E, I, E)'].item()
+            probs['P(E, I, NE)'] = x['P(E, I, NE)'].item()
+            probs['P(NE, I, E)'] = x['P(NE, I, E)'].item()
+            probs['P(NE, I, NE)'] = x['P(NE, I, NE)'].item()
+            probs['P(E, A, E)'] = x['P(E, A, E)'].item()
+            probs['P(E, A, NE)'] = x['P(E, A, NE)'].item()
+            probs['P(NE, A, E)'] = x['P(NE, A, E)'].item()
+            probs['P(NE, A, NE)'] = x['P(NE, A, NE)'].item()
+            
         probs['C(E, I, E)'] = '-'
         probs['C(E, I, NE)'] = '-'
         probs['C(NE, I, E)'] = '-'
