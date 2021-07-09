@@ -19,18 +19,13 @@ from training.dataset import _preprocess_call_data, preprocess_and_make_dataset
 from sklearn.ensemble import RandomForestClassifier
 
 CONFIG = {
-    "clusters": 40,
+    "clusters": int(sys.argv[1]),
     "transitions": "weekly",
-    "clustering": 'kmeans',
-    "pilot_start_date": "2021-05-02",
-    "calling_list": sys.argv[1],
-    "file_path": sys.argv[2]    #Path where soft assignment cluster dist need to be saved
+    "pilot_start_date": sys.argv[3],
+    "calling_list": sys.argv[4],
+    "pickle_file_path": sys.argv[5] ,
+    "file_path": sys.argv[6]   #Path where soft assignment cluster dist need to be saved
 }
-
-if CONFIG['transitions'] == 'weekly':
-    transitions = pd.read_csv("may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")
-else:
-    transitions = pd.read_csv("may_data/RMAB_one_month/transitions_SI_single_group.csv")
 
 def get_soft_clusters():
     """
@@ -41,8 +36,13 @@ def get_soft_clusters():
     pilot_beneficiary_data, pilot_call_data = load_data('feb16-mar15_data')
     pilot_call_data = _preprocess_call_data(pilot_call_data)
 
-    with open('policy_dump.pkl', 'rb') as fr:
-      pilot_user_ids, pilot_static_features, cls, cluster_transition_probabilities, m_values, q_values = pickle.load(fr)
+    with open(CONFIG['pickle_file_path'], 'rb') as fr:
+        pilot_user_ids = pickle.load(fr) 
+        pilot_static_features = pickle.load(fr) 
+        cls = pickle.load(fr) 
+        cluster_transition_probabilities = pickle.load(fr) 
+        m_values = pickle.load(fr) 
+        q_values = pickle.load(fr)
     fr.close()
 
     previous_calling_list = pd.read_csv(CONFIG['calling_list'], header=None, names=['user_id'])

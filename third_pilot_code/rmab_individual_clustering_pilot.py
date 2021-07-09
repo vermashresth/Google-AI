@@ -21,7 +21,7 @@ from training.utils import load_obj, save_obj
 from training.data import load_data
 from training.dataset import _preprocess_call_data, preprocess_and_make_dataset
 
-from sklearn.cluster import KMeans, OPTICS, SpectralClustering
+from sklearn.cluster import KMeans, OPTICS, SpectralClustering, DBSCAN
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -62,8 +62,8 @@ CONFIG = {
     "transitions": "weekly",
     "clustering": sys.argv[2],
     "pilot_start_date": sys.argv[3],
-    "fixed_beneficiary_set": sys.argv[4],
-    "calling_list": sys.argv[5],
+    # "fixed_beneficiary_set": sys.argv[4],
+    "calling_list": sys.argv[4],
     "week": 'week5'
 }
 
@@ -72,7 +72,7 @@ if CONFIG['transitions'] == 'weekly':
 else:
     transitions = pd.read_csv("may_data/RMAB_one_month/transitions_SI_single_group.csv")
 
-def kmeans_missing(X, n_clusters, max_iter=10):
+def kmeans_missing(X, max_iter=10):
     n_clusters = CONFIG['clusters']
     missing = ~np.isfinite(X)
     mu = np.nanmean(X, 0, keepdims=1)
@@ -86,14 +86,17 @@ def kmeans_missing(X, n_clusters, max_iter=10):
             cls = KMeans(n_clusters, n_jobs=-1, random_state=0)
         elif CONFIG['clustering'] == 'spectral':
             cls = SpectralClustering(n_clusters, n_jobs=-1, random_state=0)
+        elif CONFIG['clustering'] == 'dbscan':
+            cls = DBSCAN(eps=0.035, min_samples=5, algorithm='auto', leaf_size=30, n_jobs=-1)
 
         labels = cls.fit_predict(X_hat)
 
         if CONFIG['clustering'] == 'kmeans':
             centroids = cls.cluster_centers_
         else:
-            if CONFIG['clustering'] == 'optics':
+            if CONFIG['clustering'] == 'dbscan' or CONFIG['clustering'] == 'optics' :
                 labels = labels + 1
+                CONFIG['clusters'] = len(set(labels))
             unique_labels = len(set(labels))
             centroids = []
             for i in range(unique_labels):
@@ -145,7 +148,7 @@ def get_static_feature_clusters(train_beneficiaries, train_transitions, features
 
     return cluster_transition_probabilities, cls
 
-def get_individual_transition_clusters(train_beneficiaries, train_transitions, features_dataset, n_clusters):
+def get_individual_transition_clusters(train_beneficiaries, train_transitions, features_dataset):
     cols = [
         "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
     ]
@@ -164,7 +167,7 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
     all_transition_probabilities = get_all_transition_probabilities(train_beneficiaries, train_transitions)
     pass_to_kmeans_cols = ['P(L, N, L)', 'P(H, N, L)']
 
-    train_labels, centroids, _, cls, num_clusters, max_iters = kmeans_missing(all_transition_probabilities[pass_to_kmeans_cols], n_clusters, max_iter=100)
+    train_labels, centroids, _, cls, num_clusters, max_iters = kmeans_missing(all_transition_probabilities[pass_to_kmeans_cols], max_iter=100)
     
     # ipdb.set_trace()
     train_beneficiaries['cluster'] = train_labels
@@ -175,7 +178,7 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
 
     cluster_transition_probabilities = pd.DataFrame(columns=['cluster', 'count'] + cols)
 
-    for i in range(n_clusters):
+    for i in range(CONFIG['clusters']):
         cluster_beneficiaries = train_beneficiaries[train_beneficiaries['cluster'] == i]
         cluster_b_user_ids = cluster_beneficiaries['user_id']
         probs, _ = get_transition_probabilities(cluster_b_user_ids, train_transitions, min_support=3)
@@ -526,7 +529,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     pilot_static_features = np.array(pilot_static_xs, dtype=np.float)
     pilot_static_features = pilot_static_features[:, : -8]
 
-    cluster_transition_probabilities, cls = get_individual_transition_clusters(all_beneficiaries, transitions, features_dataset, CONFIG['clusters'])
+    cluster_transition_probabilities, cls = get_individual_transition_clusters(all_beneficiaries, transitions, features_dataset)
     cols = [
         "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
     ]
@@ -565,8 +568,8 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     # ipdb.set_trace()
     # Get only pilot beneficiaries
-    fixed_beneficiary_set = pd.read_csv(CONFIG['fixed_beneficiary_set'])
-    fixed_beneficiary_set = set(fixed_beneficiary_set['user_id'].to_list())
+    # fixed_beneficiary_set = pd.read_csv(CONFIG['fixed_beneficiary_set'])
+    # fixed_beneficiary_set = set(fixed_beneficiary_set['user_id'].to_list())
 
     previous_calling_list = pd.read_csv(CONFIG['calling_list'], header=None, names=['user_id'])
     previous_calling_list = set(previous_calling_list['user_id'].to_list())
@@ -579,8 +582,8 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'lstm_prediction': [], 'gold_e2c': [], 'gold_label': [], 'registration_date': [], 'current_E2C': []}
     for idx, puser_id in enumerate(pilot_user_ids):
-        if puser_id not in fixed_beneficiary_set:
-            continue
+        # if puser_id not in fixed_beneficiary_set:
+        #     continue
 
         pilot_date_num = (pd.to_datetime(CONFIG['pilot_start_date'], format="%Y-%m-%d") - pd.to_datetime("2018-01-01", format="%Y-%m-%d")).days
 
@@ -660,8 +663,14 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     df = pd.DataFrame(whittle_indices)
     df = df.sort_values('whittle_index', ascending=False)
     df.to_csv('outputs/individual_clustering/{}_{}_pilot_stats_{}_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters'], CONFIG['week']))
-
-    # ipdb.set_trace()
+    with open('./{}_{}.pkl'.format(CONFIG['clustering'], CONFIG['clusters']), "wb") as f:
+        pickle.dump(pilot_user_ids, f)
+        pickle.dump(pilot_static_features, f)
+        pickle.dump(cls, f)
+        pickle.dump(cluster_transition_probabilities, f)
+        pickle.dump(m_values, f)
+        pickle.dump(q_values, f)
+    f.close()
 
     return
 
