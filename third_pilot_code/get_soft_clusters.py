@@ -6,6 +6,7 @@ from numpy.lib.arraysetops import unique
 import pandas as pd
 import matplotlib.pyplot as plt
 from ast import literal_eval
+import ipdb
 
 import pickle
 
@@ -19,12 +20,12 @@ from training.dataset import _preprocess_call_data, preprocess_and_make_dataset
 from sklearn.ensemble import RandomForestClassifier
 
 CONFIG = {
-    "clusters": int(sys.argv[1]),
+    "clusters": 40,
     "transitions": "weekly",
-    "pilot_start_date": sys.argv[3],
-    "calling_list": sys.argv[4],
-    "pickle_file_path": sys.argv[5] ,
-    "file_path": sys.argv[6]   #Path where soft assignment cluster dist need to be saved
+    "pilot_start_date": sys.argv[1],
+    "calling_list": sys.argv[2],
+    "pickle_file_path": sys.argv[3] ,
+    "file_path": sys.argv[4]   #Path where soft assignment cluster dist need to be saved
 }
 
 def get_soft_clusters():
@@ -36,7 +37,7 @@ def get_soft_clusters():
     pilot_beneficiary_data, pilot_call_data = load_data('feb16-mar15_data')
     pilot_call_data = _preprocess_call_data(pilot_call_data)
 
-    with open(CONFIG['pickle_file_path'], 'rb') as fr:
+    with open("{}.pkl".format(CONFIG['pickle_file_path']), 'rb') as fr:
         pilot_user_ids = pickle.load(fr) 
         pilot_static_features = pickle.load(fr) 
         cls = pickle.load(fr) 
@@ -44,7 +45,7 @@ def get_soft_clusters():
         m_values = pickle.load(fr) 
         q_values = pickle.load(fr)
     fr.close()
-
+    CONFIG['clusters'] = len(list(cluster_transition_probabilities['cluster']))
     previous_calling_list = pd.read_csv(CONFIG['calling_list'], header=None, names=['user_id'])
     previous_calling_list = set(previous_calling_list['user_id'].to_list())
 
@@ -135,10 +136,10 @@ def analysis():
     df_hard_200 = df_hard.iloc[:200]
 
     df = df_soft.groupby(by=['whittle_index','cluster_set', 'probability_set'])['user_id'].count()
-    df.to_csv('outputs/cluster_count_soft.csv')
-    df = pd.read_csv('outputs/cluster_count_soft.csv')
+    df.to_csv('outputs/cluster_count_soft_{}.csv'.format(CONFIG['pickle_file_path']))
+    df = pd.read_csv('outputs/cluster_count_soft_{}.csv'.format(CONFIG['pickle_file_path']))
     df = df.sort_values('whittle_index', ascending=False)
-    df.to_csv('outputs/cluster_count_soft.csv')
+    df.to_csv('outputs/cluster_count_soft_{}.csv'.format(CONFIG['pickle_file_path']))
 
     print('For top 200 beneficiaries: ')
     print('Number of different whittle indices when soft assignment {}'.format(len(pd.unique(df_soft_200['whittle_index']))) )
@@ -191,14 +192,17 @@ def plot_probs():
         p = float(p)
         plot_p[p//0.1] = plot_p.get(p//0.1, 0) + 1
         probs[p] = probs.get(p, 0) + 1
+    for i in range(10):
+        plot_p[i] = plot_p.get(i, 0)
     x = probs.keys()
     y = probs.values()
+    # ipdb.set_trace()
     probs = {'max_probability': [], 'frequency': []}
     probs['max_probability'] = list(x)
     probs['frequency'] = list(y)
     df = pd.DataFrame(probs)
     df = df.sort_values('frequency', ascending=False)
-    df.to_csv('outputs/probability_distribution_soft.csv')
+    df.to_csv('outputs/probability_distribution_soft_{}.csv'.format(CONFIG['pickle_file_path']))
 
     data = {'Probability': list(plot_p.keys()), 'frequency': list(plot_p.values())}
     df = pd.DataFrame(data, columns=['Probability', 'frequency'])
@@ -217,7 +221,9 @@ def plot_probs():
     plt.xlabel("Probability", size=14)
       
     plt.ylabel("frequency", size=14)
-    plt.show()
+    # plt.save()
+    plt.savefig('som_exps/{}.png'.format(CONFIG['pickle_file_path']))
+    # plt.show()
 
 get_soft_clusters()
 analysis()

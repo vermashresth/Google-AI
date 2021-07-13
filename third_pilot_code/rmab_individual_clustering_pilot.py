@@ -21,7 +21,9 @@ from training.utils import load_obj, save_obj
 from training.data import load_data
 from training.dataset import _preprocess_call_data, preprocess_and_make_dataset
 
-from sklearn.cluster import KMeans, OPTICS, SpectralClustering, DBSCAN
+from sklearn.cluster import KMeans, OPTICS, SpectralClustering, DBSCAN, AffinityPropagation, AgglomerativeClustering, MeanShift
+from sklearn.mixture import GaussianMixture
+from sklearn_som.som import SOM
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -38,6 +40,7 @@ all_beneficiaries = stats[stats['Group'].isin(["Google-AI-Control", "Google-AI-C
 # features_dataset = preprocess_and_make_dataset(b_data, call_data)
 with open('may_data/features_dataset.pkl', 'rb') as fw:
     features_dataset = pickle.load(fw)
+    # ipdb.set_trace()
 fw.close()
 # exit()
 
@@ -58,12 +61,15 @@ CONFIG = {
     },
     "time_step": 7,
     "gamma": 0.99,
-    "clusters": int(sys.argv[1]),
+    "clusters": 40,
+    "bandwidth": 0.09,
+    "m_n": sys.argv[1],
     "transitions": "weekly",
     "clustering": sys.argv[2],
     "pilot_start_date": sys.argv[3],
     # "fixed_beneficiary_set": sys.argv[4],
     "calling_list": sys.argv[4],
+    "linkage": "single",
     "week": 'week5'
 }
 
@@ -71,6 +77,30 @@ if CONFIG['transitions'] == 'weekly':
     transitions = pd.read_csv("may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")
 else:
     transitions = pd.read_csv("may_data/RMAB_one_month/transitions_SI_single_group.csv")
+
+def get_gmm_labels(labels):
+    n_clusters = max(set(labels)) + 1
+    missing_labels = list()
+    for i in range(n_clusters):
+        if i not in set(labels):
+            missing_labels.append(i)
+    x = n_clusters
+    added_labels = list()
+    for label in missing_labels:
+        x = x - 1
+        while True:
+            if x in missing_labels and x not in added_labels:
+                x -= 1
+            else:
+                break
+        if label > x:
+            continue
+        for i in range(len(labels)):
+            if labels[i] == x:
+                labels[i] = label
+        added_labels.append(label)
+
+    return labels
 
 def kmeans_missing(X, max_iter=10):
     n_clusters = CONFIG['clusters']
@@ -88,8 +118,20 @@ def kmeans_missing(X, max_iter=10):
             cls = SpectralClustering(n_clusters, n_jobs=-1, random_state=0)
         elif CONFIG['clustering'] == 'dbscan':
             cls = DBSCAN(eps=0.035, min_samples=5, algorithm='auto', leaf_size=30, n_jobs=-1)
+        elif CONFIG['clustering'] == 'affinity_propagation':
+            cls = AffinityPropagation(random_state=1)
+        elif CONFIG['clustering'] == 'agglomerative':
+            cls = AgglomerativeClustering(n_clusters, linkage=CONFIG['linkage'])
+        elif CONFIG['clustering'] == 'gmm':
+            cls = GaussianMixture(random_state=0, n_components=n_clusters)
+        elif CONFIG['clustering'] == 'som':
+            mn = CONFIG['m_n'].split('_')
+            cls = SOM(m=int(mn[0]), n=int(mn[1]), dim=2)
+        elif CONFIG['clustering'] == 'meanshift':
+            cls = MeanShift(n_jobs=-1, bandwidth=CONFIG['bandwidth'])
 
         labels = cls.fit_predict(X_hat)
+        # ipdb.set_trace()
 
         if CONFIG['clustering'] == 'kmeans':
             centroids = cls.cluster_centers_
@@ -97,14 +139,23 @@ def kmeans_missing(X, max_iter=10):
             if CONFIG['clustering'] == 'dbscan' or CONFIG['clustering'] == 'optics' :
                 labels = labels + 1
                 CONFIG['clusters'] = len(set(labels))
+            elif CONFIG['clustering'] == 'affinity_propagation' or CONFIG['clustering'] == 'meanshift' :
+                CONFIG['clusters'] = len(set(labels))
+            elif CONFIG['clustering'] == 'gmm' or CONFIG['clustering'] == 'som':
+                labels = get_gmm_labels(labels)
+                CONFIG['clusters'] = len(set(labels))
+                # ipdb.set_trace()
             unique_labels = len(set(labels))
             centroids = []
             for i in range(unique_labels):
                 idxes = np.where(labels == i)[0]
                 centroids.append(np.mean(X_hat[idxes], axis=0))
             centroids = np.array(centroids)
-
-        X_hat[missing] = centroids[labels][missing]
+        # ipdb.set_trace()
+        try:
+            X_hat[missing] = centroids[labels][missing]
+        except IndexError:
+            ipdb.set_trace()
 
         if i > 0 and np.all(labels == prev_labels):
             break
@@ -662,16 +713,37 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     df = pd.DataFrame(whittle_indices)
     df = df.sort_values('whittle_index', ascending=False)
-    df.to_csv('outputs/individual_clustering/{}_{}_pilot_stats_{}_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters'], CONFIG['week']))
-    with open('./{}_{}.pkl'.format(CONFIG['clustering'], CONFIG['clusters']), "wb") as f:
-        pickle.dump(pilot_user_ids, f)
-        pickle.dump(pilot_static_features, f)
-        pickle.dump(cls, f)
-        pickle.dump(cluster_transition_probabilities, f)
-        pickle.dump(m_values, f)
-        pickle.dump(q_values, f)
-    f.close()
-
+    if CONFIG['clustering'] == 'agglomerative':
+        df.to_csv('outputs/individual_clustering/{}_{}_pilot_stats_{}_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters'], CONFIG['linkage']))
+        with open('./{}_{}_{}.pkl'.format(CONFIG['clustering'], CONFIG['clusters'], CONFIG['linkage']), "wb") as f:
+            pickle.dump(pilot_user_ids, f)
+            pickle.dump(pilot_static_features, f)
+            pickle.dump(cls, f)
+            pickle.dump(cluster_transition_probabilities, f)
+            pickle.dump(m_values, f)
+            pickle.dump(q_values, f)
+        f.close()
+    elif CONFIG['clustering'] == 'som':
+        df.to_csv('outputs/individual_clustering/{}_{}_pilot_stats_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['m_n']))
+        with open('./{}_{}.pkl'.format(CONFIG['clustering'], CONFIG['m_n']), "wb") as f:
+            pickle.dump(pilot_user_ids, f)
+            pickle.dump(pilot_static_features, f)
+            pickle.dump(cls, f)
+            pickle.dump(cluster_transition_probabilities, f)
+            pickle.dump(m_values, f)
+            pickle.dump(q_values, f)
+        f.close()
+    else:
+        df.to_csv('outputs/individual_clustering/{}_{}_pilot_stats_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))    
+        with open('./{}_{}.pkl'.format(CONFIG['clustering'], CONFIG['clusters']), "wb") as f:
+            pickle.dump(pilot_user_ids, f)
+            pickle.dump(pilot_static_features, f)
+            pickle.dump(cls, f)
+            pickle.dump(cluster_transition_probabilities, f)
+            pickle.dump(m_values, f)
+            pickle.dump(q_values, f)
+        f.close()
+    
     return
 
 def run_and_repeat(beneficiaries, transitions, call_data, CONFIG, features_dataset):

@@ -8,9 +8,11 @@ import pickle
 
 
 CONFIG = {
-    'clusters': int(sys.argv[1]),
+    'clusters': 40,
+    'm_n': sys.argv[1],
     'clustering': sys.argv[2],
-    'file_path': sys.argv[3]    #Path to the pickle file
+    'file_path': sys.argv[3],    #Path to the pickle file
+    'linkage': 'average'
     }
 
 def get_transition_probabilities(beneficiaries, transitions, min_support=3):
@@ -80,8 +82,13 @@ def get_transition_probabilities(beneficiaries, transitions, min_support=3):
 def get_probability_comparison():
 
     transitions = pd.read_csv("groundtruth_analysis/transitions_week_9.csv")
-    beneficiaries = pd.read_csv("outputs/individual_clustering/weekly_{}_pilot_stats_{}.csv".format(CONFIG['clustering'], CONFIG['clusters']))
-
+    if CONFIG['clustering'] == 'agglomerative':
+        beneficiaries = pd.read_csv("outputs/individual_clustering/weekly_{}_pilot_stats_{}_{}.csv".format(CONFIG['clustering'], CONFIG['clusters'], CONFIG['linkage']))
+    elif CONFIG['clustering'] == 'som':
+        beneficiaries = pd.read_csv("outputs/individual_clustering/weekly_{}_pilot_stats_{}.csv".format(CONFIG['clustering'], CONFIG['m_n']))
+    else:
+        beneficiaries = pd.read_csv("outputs/individual_clustering/weekly_{}_pilot_stats_{}.csv".format(CONFIG['clustering'], CONFIG['clusters']))
+        
     cols = [
             'P(E, I, E)', 'P(E, I, NE)', 'P(NE, I, E)', 'P(NE, I, NE)', 'P(E, A, E)', 'P(E, A, NE)', 'P(NE, A, E)', 'P(NE, A, NE)', 
         ]
@@ -116,25 +123,29 @@ def get_probability_comparison():
         transition_probabilities = transition_probabilities.append(probs, ignore_index=True)
         probs = dict()
         x = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == i ]
+        # ipdb.set_trace()
         try:
-            probs['P(E, I, E)'] = x['P(L, I, L)'].item()
-            probs['P(E, I, NE)'] = x['P(L, I, H)'].item()
-            probs['P(NE, I, E)'] = x['P(H, I, L)'].item()
-            probs['P(NE, I, NE)'] = x['P(H, I, H)'].item()
-            probs['P(E, A, E)'] = x['P(L, N, L)'].item()
-            probs['P(E, A, NE)'] = x['P(L, N, H)'].item()
-            probs['P(NE, A, E)'] = x['P(H, N, L)'].item()
-            probs['P(NE, A, NE)'] = x['P(H, N, H)'].item()
-        except Exception as e:
-            probs['P(E, I, E)'] = x['P(E, I, E)'].item()
-            probs['P(E, I, NE)'] = x['P(E, I, NE)'].item()
-            probs['P(NE, I, E)'] = x['P(NE, I, E)'].item()
-            probs['P(NE, I, NE)'] = x['P(NE, I, NE)'].item()
-            probs['P(E, A, E)'] = x['P(E, A, E)'].item()
-            probs['P(E, A, NE)'] = x['P(E, A, NE)'].item()
-            probs['P(NE, A, E)'] = x['P(NE, A, E)'].item()
-            probs['P(NE, A, NE)'] = x['P(NE, A, NE)'].item()
-            
+            try:
+                probs['P(E, I, E)'] = x['P(L, I, L)'].item()
+                probs['P(E, I, NE)'] = x['P(L, I, H)'].item()
+                probs['P(NE, I, E)'] = x['P(H, I, L)'].item()
+                probs['P(NE, I, NE)'] = x['P(H, I, H)'].item()
+                probs['P(E, A, E)'] = x['P(L, N, L)'].item()
+                probs['P(E, A, NE)'] = x['P(L, N, H)'].item()
+                probs['P(NE, A, E)'] = x['P(H, N, L)'].item()
+                probs['P(NE, A, NE)'] = x['P(H, N, H)'].item()
+            except IndexError as e:
+                # ipdb.set_trace()
+                probs['P(E, I, E)'] = x['P(E, I, E)'].item()
+                probs['P(E, I, NE)'] = x['P(E, I, NE)'].item()
+                probs['P(NE, I, E)'] = x['P(NE, I, E)'].item()
+                probs['P(NE, I, NE)'] = x['P(NE, I, NE)'].item()
+                probs['P(E, A, E)'] = x['P(E, A, E)'].item()
+                probs['P(E, A, NE)'] = x['P(E, A, NE)'].item()
+                probs['P(NE, A, E)'] = x['P(NE, A, E)'].item()
+                probs['P(NE, A, NE)'] = x['P(NE, A, NE)'].item()
+        except ValueError as e:
+            continue
         probs['C(E, I, E)'] = '-'
         probs['C(E, I, NE)'] = '-'
         probs['C(NE, I, E)'] = '-'
