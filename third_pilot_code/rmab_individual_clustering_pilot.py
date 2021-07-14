@@ -37,11 +37,10 @@ b_data, call_data = load_data("may_data")
 call_data = _preprocess_call_data(call_data)
 all_beneficiaries = stats[stats['Group'].isin(["Google-AI-Control", "Google-AI-Calls"])]
 
-# features_dataset = preprocess_and_make_dataset(b_data, call_data)
-with open('may_data/features_dataset.pkl', 'rb') as fw:
-    features_dataset = pickle.load(fw)
-    # ipdb.set_trace()
-fw.close()
+features_dataset = preprocess_and_make_dataset(b_data, call_data)
+# with open('may_data/features_dataset.pkl', 'rb') as fw:
+#     features_dataset = pickle.load(fw)
+# fw.close()
 # exit()
 
 # beneficiary_splits = load_obj("may_data/RMAB_one_month/weekly_beneficiary_splits_single_group.pkl")
@@ -63,7 +62,8 @@ CONFIG = {
     "gamma": 0.99,
     "clusters": 40,
     "bandwidth": 0.09,
-    "m_n": sys.argv[1],
+    # "m_n": sys.argv[1],
+    "clusters": int(sys.argv[1]),
     "transitions": "weekly",
     "clustering": sys.argv[2],
     "pilot_start_date": sys.argv[3],
