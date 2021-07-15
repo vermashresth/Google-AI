@@ -112,6 +112,7 @@ def get_soft_clusters():
                 probability_set.append(cur_probs[i])
                 cluster_set.append(i)
 
+        # It is a weighted whittle index
         whittle_indices['whittle_index'].append(whittle_index)
         whittle_indices['cluster'].append(curr_cluster)
         whittle_indices['max_probability'].append(max_prob)
@@ -128,6 +129,8 @@ def analysis():
     This method compares the soft assignment and hard assignment results.
     """
 
+    # df_soft is the dataframe that has soft clustering assignment information
+    # i.e., user_id, cluster_set, probability_set, max_probability, weighted_whittle_index
     df_soft = pd.read_csv(CONFIG['file_path'])
     df_soft_500 = df_soft.iloc[:500]
     df_soft_200 = df_soft.iloc[:200]
@@ -136,6 +139,7 @@ def analysis():
     df_hard_200 = df_hard.iloc[:200]
 
     df = df_soft.groupby(by=['whittle_index','cluster_set', 'probability_set'])['user_id'].count()
+    # This is a hack used. Directly trying to sort the values throw an error.
     df.to_csv('outputs/cluster_count_soft_{}.csv'.format(CONFIG['pickle_file_path']))
     df = pd.read_csv('outputs/cluster_count_soft_{}.csv'.format(CONFIG['pickle_file_path']))
     df = df.sort_values('whittle_index', ascending=False)
@@ -184,9 +188,15 @@ def plot_probs():
     max probabilities vs their frequency and plots the frequency of probabilities vs
     probability (probabilities lying in different ranges as [0, 0.1), [0.1, 0.2) and so on)
     """
+    
+    # df_soft is the dataframe that has soft clustering assignment information
+    # i.e., user_id, cluster_set, probability_set, max_probability, weighted_whittle_index
     df_soft = pd.read_csv(CONFIG['file_path'])
     df_soft = df_soft['max_probability']
+
+    # plot_p has the frequency of  beneficiaries with a max_probability in certain range say [0.1, 0.2)
     plot_p = {}
+    # probs has the frequency of beneficiaries with a max_prbability
     probs = {}
     for p in df_soft:
         p = float(p)
@@ -196,7 +206,6 @@ def plot_probs():
         plot_p[i] = plot_p.get(i, 0)
     x = probs.keys()
     y = probs.values()
-    # ipdb.set_trace()
     probs = {'max_probability': [], 'frequency': []}
     probs['max_probability'] = list(x)
     probs['frequency'] = list(y)
@@ -204,13 +213,18 @@ def plot_probs():
     df = df.sort_values('frequency', ascending=False)
     df.to_csv('outputs/probability_distribution_soft_{}.csv'.format(CONFIG['pickle_file_path']))
 
-    data = {'Probability': list(plot_p.keys()), 'frequency': list(plot_p.values())}
+    # Change labels of x-axis plot to probability ranges
+    x_labels = list(plot_p.keys())
+    for i in range( len(x_labels) ) :
+        x_labels[i] = f'[0.{x_labels[i]}, 0.{x_labels[i]+1})'
+    data = {'Probability': x_labels, 'frequency': list(plot_p.values())}
     df = pd.DataFrame(data, columns=['Probability', 'frequency'])
     
     plt.figure(figsize=(8, 8))
       
     plots = sns.barplot(x="Probability", y="frequency", data=df)
-      
+
+    # Annotate the bars of the plot
     for bar in plots.patches:
         plots.annotate(format(bar.get_height(), '.2f'), 
                        (bar.get_x() + bar.get_width() / 2, 
@@ -221,7 +235,6 @@ def plot_probs():
     plt.xlabel("Probability", size=14)
       
     plt.ylabel("frequency", size=14)
-    # plt.save()
     plt.savefig('som_exps/{}.png'.format(CONFIG['pickle_file_path']))
     # plt.show()
 
