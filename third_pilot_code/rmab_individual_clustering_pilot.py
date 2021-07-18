@@ -26,6 +26,7 @@ from sklearn.mixture import GaussianMixture
 from sklearn_som.som import SOM
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import mean_squared_error
 
 from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
 from tensorflow.keras.models import load_model
@@ -77,6 +78,44 @@ if CONFIG['transitions'] == 'weekly':
     transitions = pd.read_csv("may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")
 else:
     transitions = pd.read_csv("may_data/RMAB_one_month/transitions_SI_single_group.csv")
+
+
+def get_average_rmse(beneficiaries, transitions, cluster_transition_probabilities):
+    
+    cols = [
+            'P(E, I, E)', 'P(E, I, NE)', 'P(NE, I, E)', 'P(NE, I, NE)', 'P(E, A, E)', 'P(E, A, NE)', 'P(NE, A, E)', 'P(NE, A, NE)', 
+        ]
+    cols += [
+            'C(E, I, E)', 'C(E, I, NE)', 'C(NE, I, E)', 'C(NE, I, NE)', 'C(E, A, E)', 'C(E, A, NE)', 'C(NE, A, E)', 'C(NE, A, NE)', 
+        ]
+        
+    transition_probabilities = pd.DataFrame(columns=['TEST/TRAIN', 'cluster', 'count'] + cols)
+    
+    tp = get_all_transition_probabilities(beneficiaries, transitions)
+
+    rmse_sum = 0
+
+    for user_id in list(tp['user_id'].values):
+        curr_row = tp[tp['user_id'] ==  user_id]
+        probs_test = curr_row.values.tolist()[0][1:9]
+        cluster = beneficiaries[beneficiaries['user_id'] == user_id ]['cluster'].item()
+        cluster_row = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == cluster]
+        cluster_probs = cluster_row.values.tolist()[0][2:]
+        a = list()
+        b = list()
+        for i in range(8):
+            if pd.isna(probs_test[i]) or pd.isna(cluster_probs[i]):
+                continue
+            a.append(probs_test[i])
+            b.append(cluster_probs[i])
+        if len(a) == 0:
+            continue
+        rmse = mean_squared_error(a, b, squared=False)
+        rmse = np.sqrt(rmse)
+        rmse_sum += rmse
+
+    average_rmse = rmse_sum/len(tp)
+    return average_rmse
 
 def get_gmm_labels(labels):
     n_clusters = max(set(labels)) + 1
@@ -222,6 +261,10 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
     
     # ipdb.set_trace()
     train_beneficiaries['cluster'] = train_labels
+
+    # all_transition_probabilities['cluster'] = train_labels
+    # get_average_rmse(all_transition_probabilities)
+    # ipdb.set_trace()
     # test_beneficiaries['cluster'] = cls.predict(test_static_features)
 
     dt_clf = RandomForestClassifier(n_estimators=200, criterion="entropy", max_depth=30, n_jobs=-1, random_state=124)
@@ -237,7 +280,8 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
         probs['count'] = len(cluster_b_user_ids)
         cluster_transition_probabilities = cluster_transition_probabilities.append(probs, ignore_index=True)
 
-    # ipdb.set_trace()
+    rmse = get_average_rmse(train_beneficiaries, train_transitions, cluster_transition_probabilities)
+    ipdb.set_trace()
 
     return cluster_transition_probabilities, dt_clf
 
