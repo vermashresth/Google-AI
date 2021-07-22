@@ -63,14 +63,14 @@ CONFIG = {
     "gamma": 0.99,
     "clusters": 40,
     "bandwidth": 0.09,
-    # "m_n": sys.argv[1],
+    "m_n": '2_20', # This is used as an argument used in SOM
     "clusters": int(sys.argv[1]),
     "transitions": "weekly",
     "clustering": sys.argv[2],
     "pilot_start_date": sys.argv[3],
     # "fixed_beneficiary_set": sys.argv[4],
     "calling_list": sys.argv[4],
-    "linkage": "single",
+    "linkage": "single", # THis is an argument used in agglomerative clustering
     "week": 'week5'
 }
 
@@ -111,13 +111,20 @@ def get_average_rmse(beneficiaries, transitions, cluster_transition_probabilitie
         if len(a) == 0:
             continue
         rmse = mean_squared_error(a, b, squared=False)
-        rmse = np.sqrt(rmse)
         rmse_sum += rmse
 
     average_rmse = rmse_sum/len(tp)
     return average_rmse
 
 def get_gmm_labels(labels):
+    """
+    GMM and SOM cluster labels might have some indices missing
+    e.g., in case of SOM with a 1*4 grid there might not be any element in the (1,3)th box
+    this implies the labels existing would be from set {0, 1, 3}
+    This method changes the label indices such that the labels in the case abpve now belong to 
+    set {0, 1, 2} basically, the beneficiaries that were labelled 3 before are now labelled as 2.
+    """
+
     n_clusters = max(set(labels)) + 1
     missing_labels = list()
     for i in range(n_clusters):
@@ -175,6 +182,9 @@ def kmeans_missing(X, max_iter=10):
         if CONFIG['clustering'] == 'kmeans':
             centroids = cls.cluster_centers_
         else:
+            # DBSCAN and OPTICS label noise as -1, in order to start indexing from 0 we add 1
+            # DBSCAN, OPTICS, MeanShiftm do not need cluster number as arguments 
+            # Cluster labels assigned by GMM and SOM need to be processed by get_gmm_labels in order to get a continuous indexing
             if CONFIG['clustering'] == 'dbscan' or CONFIG['clustering'] == 'optics' :
                 labels = labels + 1
                 CONFIG['clusters'] = len(set(labels))

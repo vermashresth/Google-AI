@@ -36,15 +36,20 @@ def get_soft_clusters():
     """
     pilot_beneficiary_data, pilot_call_data = load_data('feb16-mar15_data')
     pilot_call_data = _preprocess_call_data(pilot_call_data)
+    try:
+        with open("{}.pkl".format(CONFIG['pickle_file_path']), 'rb') as fr:
+            pilot_user_ids = pickle.load(fr) 
+            pilot_static_features = pickle.load(fr) 
+            cls = pickle.load(fr) 
+            cluster_transition_probabilities = pickle.load(fr) 
+            m_values = pickle.load(fr) 
+            q_values = pickle.load(fr)
+        fr.close()
+    except Exception as e:
+        with open("{}.pkl".format(CONFIG['pickle_file_path']), 'rb') as fr:
+            pilot_user_ids,pilot_static_features,cls,cluster_transition_probabilities,m_values,q_values = pickle.load(fr)
+        fr.close()
 
-    with open("{}.pkl".format(CONFIG['pickle_file_path']), 'rb') as fr:
-        pilot_user_ids = pickle.load(fr) 
-        pilot_static_features = pickle.load(fr) 
-        cls = pickle.load(fr) 
-        cluster_transition_probabilities = pickle.load(fr) 
-        m_values = pickle.load(fr) 
-        q_values = pickle.load(fr)
-    fr.close()
     CONFIG['clusters'] = len(list(cluster_transition_probabilities['cluster']))
     previous_calling_list = pd.read_csv(CONFIG['calling_list'], header=None, names=['user_id'])
     previous_calling_list = set(previous_calling_list['user_id'].to_list())
@@ -213,15 +218,15 @@ def plot_probs():
     df = df.sort_values('frequency', ascending=False)
     df.to_csv('outputs/probability_distribution_soft_{}.csv'.format(CONFIG['pickle_file_path']))
 
-    # Change labels of x-axis plot to probability ranges
-    x_labels = list(plot_p.keys())
-    for i in range( len(x_labels) ) :
-        x_labels[i] = f'[0.{x_labels[i]}, 0.{x_labels[i]+1})'
-    data = {'Probability': x_labels, 'frequency': list(plot_p.values())}
-    df = pd.DataFrame(data, columns=['Probability', 'frequency'])
+    df = pd.DataFrame(columns=['Probability', 'frequency'])
     
+    # Change labels of x-axis plot to probability ranges
+    for i in sorted( plot_p.keys() ) :
+        df = df.append({'Probability': f'[0.{int(i)}, 0.{int(i+1)})',
+            'frequency': plot_p[i]}, ignore_index=True)
+
     plt.figure(figsize=(8, 8))
-      
+
     plots = sns.barplot(x="Probability", y="frequency", data=df)
 
     # Annotate the bars of the plot
@@ -232,11 +237,11 @@ def plot_probs():
                        size=15, xytext=(0, 8),
                        textcoords='offset points')
       
-    plt.xlabel("Probability", size=14)
+    plt.xlabel("Max Probability of Belonging", size=14)
       
-    plt.ylabel("frequency", size=14)
+    plt.ylabel("Frequency of Beneficiaries", size=14)
     plt.savefig('som_exps/{}.png'.format(CONFIG['pickle_file_path']))
-    # plt.show()
+    plt.show()
 
 get_soft_clusters()
 analysis()

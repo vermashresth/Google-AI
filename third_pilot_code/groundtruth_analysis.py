@@ -8,14 +8,19 @@ import pickle
 
 
 CONFIG = {
-    'clusters': 40,
-    'm_n': sys.argv[1],
+    'clusters': int(sys.argv[1]),
+    # 'm_n': sys.argv[1],
     'clustering': sys.argv[2],
     'file_path': sys.argv[3],    #Path to the pickle file
     'linkage': 'average'
     }
 
 def get_transition_probabilities(beneficiaries, transitions, min_support=3):
+    """
+    This method is used to get the transition probabilities and the count corresponding 
+    to each transition tuple.
+    """
+
     transitions = transitions[transitions['user_id'].isin(beneficiaries)]
 
     i_transitions = transitions[transitions['action']=='Intervention']
@@ -80,6 +85,10 @@ def get_transition_probabilities(beneficiaries, transitions, min_support=3):
     return transition_probabilities
 
 def get_probability_comparison():
+    """
+    This methods returns a df that has a comparison of cluster transition probabilities 
+    based on the train data and test data respectively.
+    """
 
     transitions = pd.read_csv("groundtruth_analysis/transitions_week_9.csv")
     if CONFIG['clustering'] == 'agglomerative':
@@ -162,7 +171,31 @@ def get_probability_comparison():
 
     transition_probabilities.to_csv("groundtruth_analysis/{}_{}_week_9_comp.csv".format(CONFIG['clustering'], CONFIG['clusters']))
 
+def get_all_transition_probabilities(train_beneficiaries, transitions):
+    """
+    This method returns the transition probabilities corresponding to each 
+    beneficiary.
+    """
+    cols = [
+        "P(E, I, E)", "P(E, I, NE)", "P(NE, I, E)", "P(NE, I, NE)", "P(E, A, E)", "P(E, A, NE)", "P(NE, A, E)", "P(NE, A, NE)",
+    ]
+    transition_probabilities = pd.DataFrame(columns = ['user_id'] + cols)
+    user_ids = train_beneficiaries['user_id']
+ 
+    for user_id in user_ids:
+        probs = get_transition_probabilities([user_id], transitions, min_support=1)
+        probs['user_id'] = user_id
+ 
+        transition_probabilities = transition_probabilities.append(probs, ignore_index=True)
+ 
+    return transition_probabilities
+
+
 def get_rmse():
+    """
+    This method returns the overall RMSE, RMSE based on active transition statistics,
+    RMSE based on passive transition statistics of the ground truth.
+    """
 
     transition_probabilities = pd.read_csv("groundtruth_analysis/{}_{}_week_9_comp.csv".format(CONFIG['clustering'], CONFIG['clusters']))
     test_transition_probabilities = transition_probabilities[transition_probabilities['TEST/TRAIN'] == 'Test - pilot data']
@@ -192,6 +225,9 @@ def get_rmse():
     passive_transition_probs_train += train_transition_probabilities['P(NE, A, E)'].values.tolist()
     passive_transition_probs_train += train_transition_probabilities['P(NE, A, NE)'].values.tolist()
     # ipdb.set_trace()
+
+    # Here, we remove the nan values and corresponding comparison probabilities
+
     p_train = []
     p_test = []
     for i in range(len(passive_transition_probs_train)):
@@ -216,5 +252,71 @@ def get_rmse():
     overall_rmse = mean_squared_error(p_test+a_test, p_train+a_train, squared=False)
     print(overall_rmse)
 
+
+def get_average_rmse(beneficiaries, transitions):
+    """
+    This method returns the average RMSE based on the transitions
+    and cluster transition probabilities.
+    """
+    
+    cols = [
+            'P(E, I, E)', 'P(E, I, NE)', 'P(NE, I, E)', 'P(NE, I, NE)', 'P(E, A, E)', 'P(E, A, NE)', 'P(NE, A, E)', 'P(NE, A, NE)', 
+        ]
+    cols += [
+            'C(E, I, E)', 'C(E, I, NE)', 'C(NE, I, E)', 'C(NE, I, NE)', 'C(E, A, E)', 'C(E, A, NE)', 'C(NE, A, E)', 'C(NE, A, NE)', 
+        ]
+        
+    transition_probabilities = pd.DataFrame(columns=['TEST/TRAIN', 'cluster', 'count'] + cols)
+    try:
+        with open(CONFIG['file_path'], 'rb') as fr:
+            pilot_user_ids = pickle.load(fr) 
+            pilot_static_features = pickle.load(fr) 
+            cls = pickle.load(fr) 
+            cluster_transition_probabilities = pickle.load(fr) 
+            m_values = pickle.load(fr) 
+            q_values = pickle.load(fr)
+        fr.close()
+    except Exception as e:
+        with open(CONFIG['file_path'], 'rb') as fr:
+            pilot_user_ids,pilot_static_features,cls,cluster_transition_probabilities,m_values,q_values = pickle.load(fr)
+        fr.close()
+
+    tp = get_all_transition_probabilities(beneficiaries, transitions)
+
+    rmse_sum = 0
+
+    for user_id in list(tp['user_id'].values):
+        curr_row = tp[tp['user_id'] ==  user_id]
+        probs_test = curr_row.values.tolist()[0][1:9]
+        cluster = beneficiaries[beneficiaries['user_id'] == user_id ]['cluster'].item()
+        cluster_row = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == cluster]
+        cluster_probs = cluster_row.values.tolist()[0][2:]
+        
+        # a and b are the transition statistics corresponding to each beneficiary during test and train respectively
+        a = list()
+        b = list()
+        for i in range(8):
+            if pd.isna(probs_test[i]) or pd.isna(cluster_probs[i]):
+                continue
+            a.append(probs_test[i])
+            b.append(cluster_probs[i])
+        if len(a) == 0:
+            continue
+        # This method return rmse for sklearn > 0.22.0
+        rmse = mean_squared_error(a, b, squared=False)
+        rmse_sum += rmse
+
+    average_rmse = rmse_sum/len(tp)
+    return average_rmse
+
 get_probability_comparison()
 get_rmse()
+transitions = pd.read_csv("groundtruth_analysis/transitions_week_9.csv")
+if CONFIG['clustering'] == 'agglomerative':
+    beneficiaries = pd.read_csv("outputs/individual_clustering/weekly_{}_pilot_stats_{}_{}.csv".format(CONFIG['clustering'], CONFIG['clusters'], CONFIG['linkage']))
+elif CONFIG['clustering'] == 'som':
+    beneficiaries = pd.read_csv("outputs/individual_clustering/weekly_{}_pilot_stats_{}.csv".format(CONFIG['clustering'], CONFIG['m_n']))
+else:
+    beneficiaries = pd.read_csv("outputs/individual_clustering/weekly_{}_pilot_stats_{}.csv".format(CONFIG['clustering'], CONFIG['clusters']))
+
+print(get_average_rmse(beneficiaries, transitions))
