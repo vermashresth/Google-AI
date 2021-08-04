@@ -183,5 +183,81 @@ def get_cluster_stats(whittle_indices):
 	cluster_stats.to_csv("kmeans_cluster_feature_dist.csv")
 	return cluster_stats
 
+def get_rmab_feature_dist():
+
+	CONFIG = {
+	    'calling_files': ['250_week1', '400_week2', '400_week3', '400_week4', '435_week5', '600_week6', '700_week7', '1000_week8']
+	}
+
+	rmab_group = pd.read_csv("outputs/pilot_outputs/rmab_pilot.csv")
+	rmab_user_ids = rmab_group['user_id'].values
+
+	intervention_dict = {}
+	for file in CONFIG['calling_files']:
+	    with open('intervention_lists/calling_list_{}.txt'.format(file), 'r') as fr:
+	        for line in fr:
+	            user_id = int(line.strip())
+	            if user_id in rmab_user_ids:
+	                if user_id not in intervention_dict:
+	                    intervention_dict[user_id] = [file.split('_')[1]]
+	                else:
+	                    intervention_dict[user_id].append(file.split('_')[1])
+
+	columns = [
+	'ChannelType',
+	'a',
+	'age',
+	'call_slots',
+	'education',
+    'enroll_delivery_status',
+    'enroll_gest_age', 
+    'g',
+    'income_bracket',
+    'l',
+    'language',
+    'ngo_hosp_id',
+    'p',
+    'phone_owner',
+    's'
+	]
+	f_rmab_cohort = beneficiary_data[beneficiary_data['user_id'].isin(rmab_user_ids)]
+	f_rmab_interventions = beneficiary_data[beneficiary_data['user_id'].isin(intervention_dict.keys())]
+	df = pd.DataFrame(columns = columns+['Beneficiaries'])
+
+	rmab_cohort_mean = f_rmab_cohort.mean().to_dict()
+	rmab_cohort_mean['Beneficiaries'] = 'RMAB Cohort'
+	del rmab_cohort_mean['user_id']
+	del rmab_cohort_mean['entry_date']
+	del rmab_cohort_mean['registration_date']
+
+	rmab_interventions_mean = f_rmab_interventions.mean().to_dict()
+	rmab_interventions_mean['Beneficiaries'] = 'RMAB Interventions'
+	del rmab_interventions_mean['user_id']
+	del rmab_interventions_mean['entry_date']
+	del rmab_interventions_mean['registration_date']
+
+	df = df.append(rmab_cohort_mean, ignore_index=True)
+	df = df.append(rmab_interventions_mean, ignore_index=True)
+
+	rmab_cohort_std = f_rmab_cohort.std().to_dict()
+	rmab_cohort_std['Beneficiaries'] = 'RMAB Cohort'
+	del rmab_cohort_std['user_id']
+	del rmab_cohort_std['entry_date']
+	del rmab_cohort_std['registration_date']
+
+	rmab_interventions_std = f_rmab_interventions.std().to_dict()
+	rmab_interventions_std['Beneficiaries'] = 'RMAB Interventions'
+	del rmab_interventions_std['user_id']
+	del rmab_interventions_std['entry_date']
+	del rmab_interventions_std['registration_date']
+
+	df = df.append(rmab_cohort_std, ignore_index=True)
+	df = df.append(rmab_interventions_std, ignore_index=True)
+
+	df.to_csv("~/rmab_feature_dist.csv")
+	# print(df)
+	# ipdb.set_trace()
 
 get_cluster_stats(whittle_indices)
+get_rmab_feature_dist()
+	
