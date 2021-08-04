@@ -150,8 +150,7 @@ def _preprocess_beneficiary_data(data, call_data):
 
     for idx, row, in data.iterrows():
         if row['enroll_delivery_status'] == 1:
-            row['enroll_gest_age'] += 40
-
+            data.loc[idx, ['enroll_gest_age']] += 40
     return data
 
 

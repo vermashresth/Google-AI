@@ -56,7 +56,7 @@ def get_soft_clusters():
 
     pilot_cluster_predictions = cls.predict_proba(pilot_static_features)
 
-    whittle_indices = {'user_id': [], 'whittle_index': [], 'start_state': [],'cluster': [], 'max_probability': [], 'cluster_set': [], 'probability_set': []}
+    whittle_indices = {'user_id': [], 'whittle_index_NE': [], 'whittle_index_E': [],'cluster': [], 'max_probability': [], 'cluster_set': [], 'probability_set': []}
     for idx, puser_id in enumerate(pilot_user_ids):
 
         pilot_date_num = (pd.to_datetime(CONFIG['pilot_start_date'], format="%Y-%m-%d") - pd.to_datetime("2018-01-01", format="%Y-%m-%d")).days
@@ -92,17 +92,19 @@ def get_soft_clusters():
         if puser_id in previous_calling_list:
             curr_state -= 6
 
-        if curr_state == 7:
-            whittle_indices['start_state'].append('NE')
-        elif curr_state == 6:
-            whittle_indices['start_state'].append('E')
-        elif curr_state == 1:
-            whittle_indices['start_state'].append('NE0')
-        elif curr_state == 0:
-            whittle_indices['start_state'].append('E0')
+        # if curr_state == 7:
+        #     whittle_indices['start_state'].append('NE')
+        # elif curr_state == 6:
+        #     whittle_indices['start_state'].append('E')
+        # elif curr_state == 1:
+        #     whittle_indices['start_state'].append('NE0')
+        # elif curr_state == 0:
+        #     whittle_indices['start_state'].append('E0')
                 
         whittle_indices['user_id'].append(puser_id)
-        whittle_index = 0
+        whittle_index_ne = 0
+        whittle_index_e = 0
+        
         cur_probs = pilot_cluster_predictions[idx]
         curr_cluster = -1
         max_prob = 0
@@ -112,21 +114,25 @@ def get_soft_clusters():
             if cur_probs[i] > max_prob:
                 max_prob = cur_probs[i]
                 curr_cluster = i
-            whittle_index += cur_probs[i] * m_values[i, curr_state]
+            # whittle_index += cur_probs[i] * m_values[i, curr_state]
+            
+            whittle_index_ne += cur_probs[i] * m_values[i, 7]
+            whittle_index_e += cur_probs[i] * m_values[i, 6]
             if cur_probs[i] != 0:
                 probability_set.append(cur_probs[i])
                 cluster_set.append(i)
 
         # It is a weighted whittle index
-        whittle_indices['whittle_index'].append(whittle_index)
+        whittle_indices['whittle_index_NE'].append(whittle_index_ne)
+        whittle_indices['whittle_index_E'].append(whittle_index_e)
         whittle_indices['cluster'].append(curr_cluster)
         whittle_indices['max_probability'].append(max_prob)
         whittle_indices['cluster_set'].append(cluster_set)
         whittle_indices['probability_set'].append(probability_set)
 
     df = pd.DataFrame(whittle_indices)
-    df = df.sort_values('whittle_index', ascending=False)
-    df.to_csv(CONFIG['file_path'])
+    df = df.sort_values('whittle_index_NE', ascending=False)
+    df.to_csv("whittle_indices_kmeans_soft.csv")
     return whittle_indices
 
 def analysis():
@@ -244,5 +250,5 @@ def plot_probs():
     plt.show()
 
 get_soft_clusters()
-analysis()
-plot_probs()
+# analysis()
+# plot_probs()
