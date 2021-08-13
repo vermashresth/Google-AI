@@ -45,12 +45,12 @@ CONFIG = {
     },
     "time_step": 7,
     "gamma": 0.99,
-    "clusters": int(sys.argv[1]),
+    "clusters": 40,
     "transitions": "weekly",
-    "clustering": sys.argv[2],
-    "pilot_start_date": sys.argv[3],
-    "pilot_data": sys.argv[4],
-    "interventions": int(sys.argv[5])
+    "clustering": "kmeans",
+    "pilot_start_date": sys.argv[1],
+    "pilot_data": sys.argv[2],
+    "interventions": int(sys.argv[3])
 }
 
 def run_third_pilot(CONFIG):
