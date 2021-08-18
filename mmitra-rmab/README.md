@@ -1,6 +1,7 @@
 Download the data folder.
 
 **Terminal steps:**<br/>
+pip install -r requirements.txt<br/>
 unzip policy.zip<br/>
 python rmab_individual_clustering.py <start_date> <data_folder> <num_interventions>
 
