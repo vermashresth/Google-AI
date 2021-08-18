@@ -84,9 +84,12 @@ def run_third_pilot(CONFIG):
     pilot_static_features = np.array(pilot_static_xs, dtype=np.float)
     pilot_static_features = pilot_static_features[:, : -8]
 
-    q_values = pickle.load(open("q_values",'rb'))
-    m_values = pickle.load(open("m_values",'rb'))
-    cls = pickle.load(open("cls_model",'rb'))
+#     q_values = pickle.load(open("q_values",'rb'))
+#     m_values = pickle.load(open("m_values",'rb'))
+#     cls = pickle.load(open("cls_model",'rb'))
+    with open('policy_dump.pkl', 'rb') as fr:
+      pilot_user_ids_, pilot_static_features_, cls, cluster_transition_probabilities_, m_values, q_values = pickle.load(fr)
+    fr.close()
     pilot_cluster_predictions = cls.predict(pilot_static_features)
 
     whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'registration_date': [], 'current_E2C': []}
