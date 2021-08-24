@@ -56,6 +56,7 @@ CONFIG = {
 def run_third_pilot(CONFIG):
     pilot_data = CONFIG['pilot_data']
     pilot_beneficiary_data, pilot_call_data = load_data(pilot_data)
+    pilot_beneficiary_data = pilot_beneficiary_data[pilot_beneficiary_data["isactive"]==1] # needs clarification from online database
     inf_dataset = preprocess_and_make_dataset(pilot_beneficiary_data, pilot_call_data)
     pilot_call_data = _preprocess_call_data(pilot_call_data)
     pilot_user_ids, pilot_dynamic_xs, pilot_gest_age, pilot_static_xs, pilot_hosp_id, pilot_labels = inf_dataset
@@ -91,7 +92,9 @@ def run_third_pilot(CONFIG):
       pilot_user_ids_, pilot_static_features_, cls, cluster_transition_probabilities_, m_values, q_values = pickle.load(fr)
     fr.close()
     pilot_cluster_predictions = cls.predict(pilot_static_features)
-
+    
+    ## intervention lists to be added for implementation of sleeping state constraint
+    
     whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'registration_date': [], 'current_E2C': []}
     for idx, puser_id in enumerate(pilot_user_ids):
         pilot_date_num = (pd.to_datetime(CONFIG['pilot_start_date'], format="%Y-%m-%d") - pd.to_datetime("2018-01-01", format="%Y-%m-%d")).days
