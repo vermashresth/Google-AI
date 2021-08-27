@@ -430,7 +430,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         cluster_transition_probabilities.loc[cluster_transition_probabilities['cluster'] == user_cluster, 'mean_squared_error'] = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == user_cluster]['mean_squared_error'].item() + mse_val
     
     print(total_mse, total_count, total_mse / total_count)
-    cluster_transition_probabilities.to_csv('outputs/individual_clustering/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
+    cluster_transition_probabilities.to_csv('outputs/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
     return
     
     ground_truth = np.array(ground_truth)
