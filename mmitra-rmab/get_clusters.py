@@ -49,6 +49,10 @@ dynamic_xs[:, :, 4] = dynamic_xs[:, :, 4] / 12
 static_xs = static_xs.astype(np.float32)
 static_xs[:, 0] = (static_xs[:, 0] - enroll_gest_age_mean)
 static_xs[:, 7] = (static_xs[:, 7] - days_to_first_call_mean)
+
+static_features = np.array(static_xs, dtype=np.float)
+static_features = static_features[:, : -8]
+
 features_dataset = user_ids, dynamic_xs, gest_ages, static_xs, ngo_hosp_ids, labels
 
 aug_states = []
