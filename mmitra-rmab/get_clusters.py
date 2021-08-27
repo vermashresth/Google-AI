@@ -30,7 +30,7 @@ from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
 from tensorflow.keras.models import load_model
 from training.modelling.dataloader import get_train_val_test
 
-stats = pd.read_csv("feb16-mar15_data/beneficiary_stats.csv")#"may_data/beneficiary_stats_v5.csv")
+stats = pd.read_csv("beneficiary_stats.csv")#"may_data/beneficiary_stats_v5.csv")
 beneficiary_data = pd.read_csv("feb16-mar15_data/beneficiary/ai_registration-20210216-20210315.csv")#"may_data/beneficiary/AIRegistration-20200501-20200731.csv")
 b_data, call_data = load_data("feb16-mar15_data")#"may_data")
 call_data = _preprocess_call_data(call_data)
@@ -77,7 +77,7 @@ CONFIG = {
 }
 
 if CONFIG['transitions'] == 'weekly':
-    transitions = pd.read_csv("may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")
+    transitions = pd.read_csv("outputs/pilot_transitions.csv")
 
 def kmeans_missing(X, n_clusters, max_iter=10):
     n_clusters = CONFIG['clusters']
