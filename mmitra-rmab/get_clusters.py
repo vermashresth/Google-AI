@@ -432,5 +432,10 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     print(total_mse, total_count, total_mse / total_count)
     cluster_transition_probabilities.to_csv('outputs/individual_clustering/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
     return
+    
+    ground_truth = np.array(ground_truth)
+    with open('gt_beneficiary_probs.pkl', 'wb') as fr:
+        pickle.dump(ground_truth, fr)
+    fr.close()
 
 run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, beneficiary_data)
