@@ -50,9 +50,6 @@ static_xs = static_xs.astype(np.float32)
 static_xs[:, 0] = (static_xs[:, 0] - enroll_gest_age_mean)
 static_xs[:, 7] = (static_xs[:, 7] - days_to_first_call_mean)
 
-static_features = np.array(static_xs, dtype=np.float)
-static_features = static_features[:, : -8]
-
 features_dataset = user_ids, dynamic_xs, gest_ages, static_xs, ngo_hosp_ids, labels
 
 aug_states = []
@@ -70,10 +67,9 @@ CONFIG = {
     },
     "time_step": 7,
     "gamma": 0.99,
-    "clusters": int(sys.argv[1]),
+    "clusters": 0,
     "transitions": "weekly",
-    "clustering": sys.argv[2],
-    "pilot_start_date": sys.argv[3]
+    "clustering": "kmeans"
 }
 
 if CONFIG['transitions'] == 'weekly':
