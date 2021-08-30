@@ -400,7 +400,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     for user_id in train_b_ids:
         flag = False
         user_cluster = train_beneficiaries[train_beneficiaries['user_id'] == user_id]['cluster'].item()
-        user_probs, _ = get_transition_probabilities([user_id], transitions)
+        user_probs, _ = get_transition_probabilities([user_id], transitions, 1)
         user_prob_list = [user_probs['P(L, N, L)'], user_probs['P(H, N, L)']]
         ground_truth.append(user_prob_list)
         cluster_row = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == user_cluster]
