@@ -92,12 +92,16 @@ def run_third_pilot(CONFIG):
     fr.close()
     pilot_cluster_predictions = cls.predict(pilot_static_features)
     
-    ## intervention lists to be added for implementation of sleeping state constraint
+    df_intervention = pd.read_csv("data/intervention_data.csv")
+    intervention_users = df_intervention['beneficiary_id'].to_list()
     
     whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'registration_date': [], 'current_E2C': []}
     for idx, puser_id in enumerate(pilot_user_ids):
         pilot_date_num = (pd.to_datetime(CONFIG['pilot_start_date'], format="%Y-%m-%d") - pd.to_datetime("2018-01-01", format="%Y-%m-%d")).days
-
+        
+        if puser_id in intervention_users:
+            continue
+        
         if CONFIG['transitions'] == 'weekly':
             past_days_calls = pilot_call_data[
             (pilot_call_data["user_id"]==puser_id)&
