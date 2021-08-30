@@ -15,17 +15,18 @@ g, p, s, l, a, ppc_bloodpressure, ppc_diabetes, ppc_cesarean, ppc_thyroid,  ppc_
 ppc_pretermDelivery, ppc_anaemia, ppc_otherComplications, name_of_medication_any, planned_place_of_delivery, registered_where, registered_pregnancy,
 place_of_delivery, type_of_delivery, date_registration_hospital, term_of_delivery, medication_after_delivery
 FROM vw_beneficiaries u
+WHERE isactive = 1
 LEFT OUTER JOIN call_slot csl ON csl.id = u.call_slots
 LEFT OUTER JOIN channels c ON c.id = u.ngo_hosp_id
-ORDER BY u.id;" | /google/data/ro/projects/speckle/mysql -h 34.93.230.87 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/beneficiary/beneficiary_pilot_data.csv
+ORDER BY u.id;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/beneficiary/beneficiary_pilot_data.csv
 sed -i 's/LANGUAGE/language/' data/beneficiary/beneficiary_pilot_data.csv
 
 # Call data
 echo "SELECT id, user_id, startdatetime, enddatetime, duration, gest_age, dropreason, callStatus, missedcall_id, media_id, esb_trans_id, tid, tsp_id
-FROM vw_call_logs;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/call_data.csv
+FROM vw_call_logs;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/call/call_data.csv
 
 # Intervention lists
 echo "SELECT beneficiary_id, intervention_date
 FROM vw_intervention_list
-WHERE intervention_date < ${DATE} AND intervention_date >= ${DATE}-21;"| /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/intervention_data.csv
+WHERE intervention_date < ${DATE} AND intervention_date >= DATEADD(day, -21, ${DATE});"| /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/intervention_data.csv
 
