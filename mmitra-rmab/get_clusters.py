@@ -73,7 +73,7 @@ CONFIG = {
 }
 
 if CONFIG['transitions'] == 'weekly':
-    transitions = pd.read_csv("outputs/pilot_transitions.csv")
+    transitions = pd.read_csv("outputs/pilot_transitions_5months.csv")
 
 def kmeans_missing(X, n_clusters, max_iter=10):
     n_clusters = CONFIG['clusters']
