@@ -76,9 +76,9 @@ def _merge_beneficiary_files(
 
 
 def load_beneficiary_data(data_dir: str):
-    if os.path.exists(data_dir + "/saves/c_beneficiary.pkl"):
-        beneficiary_data = load_obj(data_dir + "/saves/c_beneficiary.pkl")
-        return beneficiary_data
+    #if os.path.exists(data_dir + "/saves/c_beneficiary.pkl"):
+    #    beneficiary_data = load_obj(data_dir + "/saves/c_beneficiary.pkl")
+    #    return beneficiary_data
 
     beneficiary_dir = os.path.join(data_dir, "beneficiary")
     if os.path.exists(beneficiary_dir):
@@ -100,7 +100,7 @@ def load_beneficiary_data(data_dir: str):
             % beneficiary_data.shape[0]
         )
 
-        save_obj(beneficiary_data, data_dir + "/saves/c_beneficiary.pkl")
+        #save_obj(beneficiary_data, data_dir + "/saves/c_beneficiary.pkl")
 
         return beneficiary_data
 
