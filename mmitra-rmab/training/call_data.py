@@ -128,9 +128,9 @@ def _merge_call_files(
 
 
 def load_call_data(data_dir: str, beneficiaries: pd.Series = None):
-    if os.path.exists(data_dir + "/saves/c_call.pkl"):
-        call_data = load_obj(data_dir + "/saves/c_call.pkl")
-        return call_data
+    #if os.path.exists(data_dir + "/saves/c_call.pkl"):
+    #    call_data = load_obj(data_dir + "/saves/c_call.pkl")
+    #    return call_data
 
     call_dir = os.path.join(data_dir, "call")
     if os.path.exists(call_dir):
