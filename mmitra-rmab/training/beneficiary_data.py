@@ -93,7 +93,7 @@ def load_beneficiary_data(data_dir: str):
 
         logging.info("Loading and cleaning beneficiary data.")
         beneficiary_data = _merge_beneficiary_files(beneficiary_files)
-        save_obj(beneficiary_data, data_dir + "/saves/c_beneficiary.pkl")
+        #save_obj(beneficiary_data, data_dir + "/saves/c_beneficiary.pkl")
 
         logging.info(
             "Beneficiary data contains data for %d beneficiaries."
