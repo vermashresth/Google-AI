@@ -23,7 +23,8 @@ sed -i 's/LANGUAGE/language/' data/beneficiary/beneficiary_pilot_data.csv
 
 # Call data
 echo "SELECT id, user_id, startdatetime, enddatetime, duration, gest_age, dropreason, callStatus, missedcall_id, media_id, esb_trans_id, tid, tsp_id
-FROM vw_call_logs;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/call/call_data.csv
+FROM vw_call_logs
+WHERE startdatetime < ${DATE} AND startdatetime >= date_add(${DATE}, interval -7 day);" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/call/call_data.csv
 
 # Intervention lists
 echo "SELECT beneficiary_id, intervention_date
