@@ -160,7 +160,7 @@ def run_third_pilot(CONFIG):
     #df.to_csv('checking_{}_{}_pilot_stats_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
     df_ = df[df['start_state']=='NE']
     df_ = df_[:CONFIG["interventions"]]
-    df_ = df['user_id']
+    df_ = df_['user_id']
     df_.to_csv('user_interventions.csv', index=False)
     return
 
