@@ -28,5 +28,5 @@ FROM vw_call_logs;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 
 # Intervention lists
 echo "SELECT beneficiary_id, intervention_date
 FROM vw_intervention_list
-WHERE intervention_date < ${DATE} AND intervention_date >= DATEADD(day, -21, ${DATE});"| /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/intervention_data.csv
+WHERE intervention_date < ${DATE} AND intervention_date >= date_add(${DATE}, interval -21 day);"| /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/intervention_data.csv
 
