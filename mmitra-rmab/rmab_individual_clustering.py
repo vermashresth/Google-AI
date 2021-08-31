@@ -157,6 +157,7 @@ def run_third_pilot(CONFIG):
 
     df = pd.DataFrame(whittle_indices)
     df = df.sort_values('whittle_index', ascending=False)
+    df = df[df['start_state']=='E']
     #df.to_csv('checking_{}_{}_pilot_stats_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
     df = df[:CONFIG["interventions"]]
     df_ = df['user_id']
