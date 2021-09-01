@@ -12,6 +12,7 @@ from .data_utils import (
     age_to_int,
     ch_type_to_int,
     income_bracket_to_int,
+    enroll_delivery_status_to_int
 )
 from .utils import save_obj, load_obj
 
@@ -48,6 +49,7 @@ def _merge_beneficiary_files(
         "age": age_to_int,
         "ChannelType": ch_type_to_int,
         "income_bracket": income_bracket_to_int,
+        "enroll_delivery_status": enroll_delivery_status_to_int
     },
 ):
 
