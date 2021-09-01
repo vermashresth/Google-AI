@@ -15,10 +15,10 @@ g, p, s, l, a, ppc_bloodpressure, ppc_diabetes, ppc_cesarean, ppc_thyroid,  ppc_
 ppc_pretermDelivery, ppc_anaemia, ppc_otherComplications, name_of_medication_any, planned_place_of_delivery, registered_where, registered_pregnancy,
 place_of_delivery, type_of_delivery, date_registration_hospital, term_of_delivery, medication_after_delivery
 FROM vw_beneficiaries u
-WHERE isactive = 1
+WHERE isactive = '1'
 LEFT OUTER JOIN call_slot csl ON csl.call_slot_id = u.call_slot_id
 LEFT OUTER JOIN channels c ON c.channel_id = u.channel_id
-ORDER BY u.id;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/beneficiary/beneficiary_pilot_data.csv
+ORDER BY u.beneficiary_id;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/beneficiary/beneficiary_pilot_data.csv
 sed -i 's/LANGUAGE/language/' data/beneficiary/beneficiary_pilot_data.csv
 
 # Call data
@@ -29,5 +29,5 @@ WHERE startdatetime < ${DATE} AND startdatetime >= date_add(${DATE}, interval -7
 # Intervention lists
 echo "SELECT beneficiary_id, intervention_date
 FROM vw_intervention_list
-WHERE intervention_date < ${DATE} AND intervention_date >= date_add(${DATE}, interval -21 day) AND intervention_success = 1;"| /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/intervention_data.csv
+WHERE intervention_date < ${DATE} AND intervention_date >= date_add(${DATE}, interval -21 day) AND intervention_success = '1';"| /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/intervention_data.csv
 
