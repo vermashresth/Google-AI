@@ -6,7 +6,7 @@ DATE=$3
 
 # Get Beneficiary Data
 echo "SELECT u.beneficiary_id user_id, MD5(phone_no) phone_no, lmp_date lmp, enrollment_gestation_age enroll_gest_age, u.project_id, call_slot_id call_slots, enrollment_delivery_status enroll_delivery_status,
-language_id LANGUAGE, registration_date, delivery_date, entry_date, phone_type, phone_code, phone_owner
+language_id LANGUAGE, registration_date, delivery_date, entry_date, phone_type, phone_code, phone_owner,
 channel_id ngo_hosp_id, CASE c.channel_type WHEN 1 THEN 'Community' WHEN 2 THEN 'Hospital' ELSE 'ARMMAN' END AS ChannelType,
 unique_id unique_sub_id, entry_madeby, entry_updatedby,
 forced_delivery_update force_delivery_updated, completed,  dnd_optout_status, age, education_id education,
