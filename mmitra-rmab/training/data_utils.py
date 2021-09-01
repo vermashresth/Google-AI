@@ -114,12 +114,12 @@ def phowner_to_int(inp: str) -> int:
     """
     Convert phone_owner to int
     """
-    vals = {"woman": 0, "husband": 1, "family": 2}
+    vals = {"woman": 0, "husband": 1, "family": 2, 'women': 0}
     if inp.lower().strip() in vals.keys():
         return vals[inp.lower().strip()]
     else:
-        logging.warning(f"{inp} is not a valid phone owner. Outputting NA.")
-        return pd.NaT
+        #logging.warning(f"{inp} is not a valid phone owner. Outputting NA.")
+        return 2 #pd.NaT
 
 
 def ch_type_to_int(inp: str) -> int:
