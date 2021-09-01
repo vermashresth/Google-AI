@@ -98,6 +98,8 @@ def wrap_date_to_int(fmt: str):
 def wrap_time_to_int(fmt: str):
     return lambda x: time_to_int(x, fmt)
 
+def enroll_delivery_status_to_int(inp: str):
+    return 1 if inp == 'D' else 0
 
 def education_to_int(inp: int) -> int:
     """
@@ -138,6 +140,7 @@ def income_bracket_to_int(inp: str) -> int:
     """
     Convert income_bracket to int
     """
+    return int(inp) - 1
     vals = {
         "0-5000": 0,
         "5000-10000": 1,
