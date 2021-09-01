@@ -17,7 +17,7 @@ place_of_delivery, type_of_delivery, date_registration_hospital, term_of_deliver
 FROM vw_beneficiaries u
 WHERE isactive = 1
 LEFT OUTER JOIN call_slot csl ON csl.id = u.call_slots
-LEFT OUTER JOIN channels c ON c.id = u.ngo_hosp_id
+LEFT OUTER JOIN channels c ON c.id = u.channel_id
 ORDER BY u.id;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/beneficiary/beneficiary_pilot_data.csv
 sed -i 's/LANGUAGE/language/' data/beneficiary/beneficiary_pilot_data.csv
 
