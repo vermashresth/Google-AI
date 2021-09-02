@@ -28,6 +28,6 @@ WHERE startdatetime < '${DATE}' AND startdatetime >= date_add('${DATE}', interva
 
 # Intervention lists
 echo "SELECT beneficiary_id, intervention_date, intervention_success
-FROM vw_intervention_list
+FROM intervention_list
 WHERE intervention_date < '${DATE}' AND intervention_date >= date_add('${DATE}', interval -21 day) AND intervention_success = 1;"| /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/intervention_data.csv
 
