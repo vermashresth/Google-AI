@@ -323,7 +323,7 @@ def _build(beneficiaries, beneficiary_data, call_data, config):
 def _build_dataset(beneficiary_data, call_data):
     # configuration for generating features
     config = {
-        "input_length": 30,
+        "input_length": 7, #30,
         "input_calls_thresh": 1,
         "input_calls_max": 10,
         "output_min_calls_thresh": 1,
