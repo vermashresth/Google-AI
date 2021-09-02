@@ -161,7 +161,7 @@ def run_third_pilot(CONFIG):
     df_ = df[df['start_state']=='NE']
     df_ = df_[:CONFIG["interventions"]]
     df_ = df_['user_id']
-    df_.to_csv('user_interventions.csv', index=False)
+    df_.to_csv('user_interventions.csv', index=False, header=False)
     return
 
 run_third_pilot(CONFIG)
