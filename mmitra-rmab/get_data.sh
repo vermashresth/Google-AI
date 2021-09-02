@@ -17,14 +17,14 @@ place_of_delivery, type_of_delivery, date_registration_hospital, term_of_deliver
 FROM vw_beneficiaries u
 LEFT OUTER JOIN call_slot csl ON csl.call_slot_id = u.call_slot_id
 LEFT OUTER JOIN channels c ON c.channel_id = u.channel_id
-WHERE u.isactive = 1
+WHERE u.isactive = 1 AND registration_date >= '2021-02-16'
 ORDER BY u.beneficiary_id;" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/beneficiary/beneficiary_pilot_data.csv
 sed -i 's/LANGUAGE/language/' data/beneficiary/beneficiary_pilot_data.csv
 
 # Call data
 echo "SELECT beneficiary_id user_id, startdatetime, enddatetime, duration, gest_age, dropreason, call_status_id callStatus, missed_call_id missedcall_id, media_id, esb_trans_id, tsp_id
 FROM vw_call_logs
-WHERE startdatetime < '${DATE}';" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/call/call_data.csv
+WHERE startdatetime < '${DATE}' AND startdatetime >= '2021-02-16';" | /google/data/ro/projects/speckle/mysql -h 34.93.237.61 -P 3306 -u ${USERNAME} --password=${PASSWORD} mmitrav2 > data/call/call_data.csv
 
 # Intervention lists
 echo "SELECT beneficiary_id, intervention_date, intervention_success
