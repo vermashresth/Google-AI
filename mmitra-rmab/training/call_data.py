@@ -134,15 +134,16 @@ def load_call_data(data_dir: str, beneficiaries: pd.Series = None):
 
     call_dir = os.path.join(data_dir, "call")
     if 1: #os.path.exists(call_dir):
-        call_files = get_csv_files(call_dir)
+#         call_files = get_csv_files(call_dir)
 
-        if len(call_files) == 0:
-            FileNotFoundError("Input directory '%s' is empty." % call_dir)
+#         if len(call_files) == 0:
+#             FileNotFoundError("Input directory '%s' is empty." % call_dir)
 
-        logging.info("Found %d files in '%s'." % (len(call_files), call_dir))
+#         logging.info("Found %d files in '%s'." % (len(call_files), call_dir))
 
-        logging.info("Loading and cleaning call data.")
-        call_data = _merge_call_files(call_files, beneficiaries)
+#         logging.info("Loading and cleaning call data.")
+
+        call_data = _merge_call_files(beneficiaries)
 
         logging.info(
             "Call data contains %d relevant call records for %d beneficiaries."
