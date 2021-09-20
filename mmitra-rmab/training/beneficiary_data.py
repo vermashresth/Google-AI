@@ -84,17 +84,17 @@ def load_beneficiary_data(data_dir: str):
 
     beneficiary_dir = os.path.join(data_dir, "beneficiary")
     if 1: #os.path.exists(beneficiary_dir):
-        beneficiary_files = get_csv_files(beneficiary_dir)
+#         beneficiary_files = get_csv_files(beneficiary_dir)
 
-        if len(beneficiary_files) == 0:
-            FileNotFoundError("Input directory '%s' is empty." % beneficiary_dir)
+#         if len(beneficiary_files) == 0:
+#             FileNotFoundError("Input directory '%s' is empty." % beneficiary_dir)
 
-        logging.info(
-            "Found %d files in '%s'." % (len(beneficiary_files), beneficiary_dir)
-        )
+#         logging.info(
+#             "Found %d files in '%s'." % (len(beneficiary_files), beneficiary_dir)
+#         )
 
-        logging.info("Loading and cleaning beneficiary data.")
-        beneficiary_data = _merge_beneficiary_files(beneficiary_files)
+#         logging.info("Loading and cleaning beneficiary data.")
+        beneficiary_data = _merge_beneficiary_files()#beneficiary_files)
         #save_obj(beneficiary_data, data_dir + "/saves/c_beneficiary.pkl")
 
         logging.info(
