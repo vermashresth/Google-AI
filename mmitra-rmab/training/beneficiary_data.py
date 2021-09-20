@@ -83,7 +83,7 @@ def load_beneficiary_data(data_dir: str):
     #    return beneficiary_data
 
     beneficiary_dir = os.path.join(data_dir, "beneficiary")
-    if os.path.exists(beneficiary_dir):
+    if 1: #os.path.exists(beneficiary_dir):
         beneficiary_files = get_csv_files(beneficiary_dir)
 
         if len(beneficiary_files) == 0:
