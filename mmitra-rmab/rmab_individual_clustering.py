@@ -92,11 +92,34 @@ def run_third_pilot(CONFIG):
     fr.close()
     pilot_cluster_predictions = cls.predict(pilot_static_features)
     
+    import mysql.connector
+    from mysql.connector.constants import ClientFlag
+    import pandas as pd
+    config = {
+        'user': 'googleai',
+        'password': '4UY(@{SqH{',
+        'host': '34.93.237.61',
+        'client_flags': [ClientFlag.SSL]
+    }
+
+    # now we establish our connection
+
+    config['database'] = 'mmitrav2'  # add new database to config dict
+    cnxn = mysql.connector.connect(**config)
+    cursor = cnxn.cursor()
+    query = "SELECT beneficiary_id, intervention_date, intervention_success
+    FROM intervention_list
+    WHERE intervention_date < '${DATE}' AND intervention_date >= date_add('${DATE}', interval -21 day) AND intervention_success = 1;"
     try:
-        df_intervention = pd.read_csv("data/intervention_data.csv",sep="\t")
+        df_intervention = pd.read_sql(query, cnxn)
         intervention_users = df_intervention['beneficiary_id'].to_list()
     except:
         intervention_users = []
+#     try:
+#         df_intervention = pd.read_csv("data/intervention_data.csv",sep="\t")
+#         intervention_users = df_intervention['beneficiary_id'].to_list()
+#     except:
+#         intervention_users = []
         
     whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'registration_date': [], 'current_E2C': []}
     for idx, puser_id in enumerate(pilot_user_ids):
