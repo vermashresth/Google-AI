@@ -133,7 +133,7 @@ def load_call_data(data_dir: str, beneficiaries: pd.Series = None):
     #    return call_data
 
     call_dir = os.path.join(data_dir, "call")
-    if os.path.exists(call_dir):
+    if 1: #os.path.exists(call_dir):
         call_files = get_csv_files(call_dir)
 
         if len(call_files) == 0:
