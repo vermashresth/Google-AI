@@ -77,7 +77,7 @@ def _merge_beneficiary_files(
     return data
 
 
-def load_beneficiary_data(data_dir: str):
+def load_beneficiary_data():#data_dir: str):
     #if os.path.exists(data_dir + "/saves/c_beneficiary.pkl"):
     #    beneficiary_data = load_obj(data_dir + "/saves/c_beneficiary.pkl")
     #    return beneficiary_data
