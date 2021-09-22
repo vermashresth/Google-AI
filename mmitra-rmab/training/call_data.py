@@ -86,21 +86,42 @@ def _convert_log_data(data: pd.DataFrame):
 
 
 def _merge_call_files(
-    filelist: list, include_benfs: pd.Series,
+#     filelist: list, 
+    include_benfs: pd.Series,
 ):
+    import mysql.connector
+    from mysql.connector.constants import ClientFlag
+    import pandas as pd
+    config = {
+        'user': 'googleai',
+        'password': '4UY(@{SqH{',
+        'host': '34.93.237.61',
+        'client_flags': [ClientFlag.SSL]
+    }
+
+    # now we establish our connection
+
+    config['database'] = 'mmitrav2'  # add new database to config dict
+    cnxn = mysql.connector.connect(**config)
+    cursor = cnxn.cursor()
+    query = "SELECT beneficiary_id user_id, startdatetime, enddatetime, duration, gest_age, dropreason, call_status_id callStatus, missed_call_id missedcall_id, media_id, esb_trans_id, tsp_id
+    FROM vw_call_logs
+    WHERE startdatetime < '${DATE}' AND startdatetime >= '2021-02-16';"
+    df = pd.read_sql(query, cnxn)
+    df = df[CALL_COLUMNS]
 
     data = pd.concat(
-        [
-            pd.read_csv(
-                f,
-                usecols=CALL_COLUMNS,
-                low_memory=True,
-                engine="python",
-                error_bad_lines=False,
-                warn_bad_lines=False,
-                sep='\t'
-            )
-            for f in tqdm(filelist)
+        [   df
+#             pd.read_csv(
+#                 f,
+#                 usecols=CALL_COLUMNS,
+#                 low_memory=True,
+#                 engine="python",
+#                 error_bad_lines=False,
+#                 warn_bad_lines=False,
+#                 sep='\t'
+#             )
+#             for f in tqdm(filelist)
         ],
         ignore_index=True,
     )
