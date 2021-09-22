@@ -40,7 +40,7 @@ BENEFICIARY_COLUMNS = [
 
 
 def _merge_beneficiary_files(
-    file_list: list,
+#     file_list: list,
     converters={
         "entry_date": wrap_date_to_int("%Y-%m-%d %H:%M:%S"),
         "registration_date": wrap_date_to_int("%Y-%m-%d"),
@@ -52,20 +52,52 @@ def _merge_beneficiary_files(
         "enroll_delivery_status": enroll_delivery_status_to_int
     },
 ):
+    import mysql.connector
+    from mysql.connector.constants import ClientFlag
+    import pandas as pd
+    config = {
+        'user': 'googleai',
+        'password': '4UY(@{SqH{',
+        'host': '34.93.237.61',
+        'client_flags': [ClientFlag.SSL]
+    }
 
+    # now we establish our connection
+
+    config['database'] = 'mmitrav2'  # add new database to config dict
+    cnxn = mysql.connector.connect(**config)
+    cursor = cnxn.cursor()
+    query = "SELECT u.beneficiary_id user_id, isactive, phone_no, lmp_date lmp, enrollment_gestation_age enroll_gest_age, u.project_id, u.call_slot_id call_slots, enrollment_delivery_status enroll_delivery_status,
+    language_id LANGUAGE, registration_date, delivery_date, entry_date, phone_type, phone_code, phone_owner,
+    u.channel_id ngo_hosp_id, CASE c.channel_type WHEN 1 THEN 'Community' WHEN 2 THEN 'Hospital' ELSE 'ARMMAN' END AS ChannelType,
+    unique_id unique_sub_id, entry_madeby, entry_updatedby,
+    forced_delivery_update force_delivery_updated, completed,  dnd_optout_status, age, education_id education,
+    alternate_phone_no, alternate_phone_owner alternate_no_owner, name_of_sakhi, name_of_project_officer, income_bracket, data_entry_officer,
+    g, p, s, l, a, ppc_bloodpressure, ppc_diabetes, ppc_cesarean, ppc_thyroid,  ppc_fibroid, ppc_spontaneousAbortion, ppc_heightLess140,
+    ppc_pretermDelivery, ppc_anaemia, ppc_otherComplications, name_of_medication_any, planned_place_of_delivery, registered_where, registered_pregnancy,
+    place_of_delivery, type_of_delivery, date_registration_hospital, term_of_delivery, medication_after_delivery
+    FROM vw_beneficiaries u
+    LEFT OUTER JOIN call_slot csl ON csl.call_slot_id = u.call_slot_id
+    LEFT OUTER JOIN channels c ON c.channel_id = u.channel_id
+    WHERE u.isactive = 1 AND registration_date >= '2021-02-16'
+    ORDER BY u.beneficiary_id;"
+    df = pd.read_sql(query, cnxn)
+    df = df[BENEFICIARY_COLUMNS]
+    for i in BENEFICIARY_COLUMNS:
+        df[i] = df[i].apply(converters[i])
     data = pd.concat(
-        [
-            pd.read_csv(
-                f,
-                usecols=BENEFICIARY_COLUMNS,
-                converters=converters,
-                low_memory=True,
-                engine="python",
-                error_bad_lines=False,
-                warn_bad_lines=False,
-                sep='\t'
-            )
-            for f in file_list
+        [ 
+#             pd.read_csv(
+#                 f,
+#                 usecols=BENEFICIARY_COLUMNS,
+#                 converters=converters,
+#                 low_memory=True,
+#                 engine="python",
+#                 error_bad_lines=False,
+#                 warn_bad_lines=False,
+#                 sep='\t'
+#             )
+#             for f in file_list
         ],
         ignore_index=True,
     )
