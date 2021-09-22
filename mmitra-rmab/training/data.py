@@ -6,15 +6,15 @@ from .beneficiary_data import load_beneficiary_data
 from .call_data import load_call_data
 
 
-def load_data(data_dir: str):
+def load_data():#data_dir: str):
 
-    if not os.path.exists(data_dir):
-        raise FileNotFoundError("Input directory '%s' does not exist." % data_dir)
+#     if not os.path.exists(data_dir):
+#         raise FileNotFoundError("Input directory '%s' does not exist." % data_dir)
 
-    logging.info("Loading data from folder '%s'" % (data_dir))
+#     logging.info("Loading data from folder '%s'" % (data_dir))
 
-    beneficary_data = load_beneficiary_data(data_dir)
-    call_data = load_call_data(data_dir, beneficary_data["user_id"])
+    beneficary_data = load_beneficiary_data()#data_dir)
+    call_data = load_call_data(beneficary_data["user_id"]) #data_dir, beneficary_data["user_id"])
 
     beneficary_data = beneficary_data[
         beneficary_data["user_id"].isin(call_data["user_id"])
