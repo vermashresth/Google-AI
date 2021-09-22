@@ -55,7 +55,7 @@ CONFIG = {
 
 def run_third_pilot(CONFIG):
     pilot_data = CONFIG['pilot_data']
-    pilot_beneficiary_data, pilot_call_data = load_data(pilot_data)
+    pilot_beneficiary_data, pilot_call_data = load_data()#pilot_data)
     inf_dataset = preprocess_and_make_dataset(pilot_beneficiary_data, pilot_call_data)
     pilot_call_data = _preprocess_call_data(pilot_call_data)
     pilot_user_ids, pilot_dynamic_xs, pilot_gest_age, pilot_static_xs, pilot_hosp_id, pilot_labels = inf_dataset
