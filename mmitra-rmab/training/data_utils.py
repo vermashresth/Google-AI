@@ -106,7 +106,7 @@ def education_to_int(inp: int) -> int:
     Educaton level to int. If 7(illiterate) convert to 0
     """
     try:
-        return 0 if inp == 7 else int(inp)
+        return 0 if int(inp) == 7 else int(inp)
     except:
         logging.warning(f"{inp} is not a valid education. Outputting NA.")
         return pd.NaT
