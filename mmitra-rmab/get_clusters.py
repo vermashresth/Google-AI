@@ -435,7 +435,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     print(std)
     q_values, m_values = plan(cluster_transition_probabilities, CONFIG)
     whittle_classifier = q_values, m_values, cls
-    with open('whittle_classifier_'+str(CONFIG["clusters"])+.pkl', 'wb') as fr:
+    with open('whittle_classifier_'+str(CONFIG["clusters"])+'.pkl', 'wb') as fr:
         pickle.dump(whittle_classifier, fr)
     fr.close()
     ground_truth = np.array(ground_truth)
