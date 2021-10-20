@@ -1,3 +1,4 @@
+**Python version 3.8 must be used**
 
 **Terminal steps:**<br/>
 For SQL within python:<br/>
