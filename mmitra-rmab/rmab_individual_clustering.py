@@ -70,8 +70,10 @@ CONFIG = {
     "clusters": int(sys.argv[1]),
     "transitions": "weekly",
     "clustering": sys.argv[2],
-    "pilot_start_date": sys.argv[3]
+    "pilot_start_date": sys.argv[3],
+    "pilot_folder": sys.argv[4]
 }
+pilot_folder = CONFIG["pilot_folder"]
 
 if CONFIG['transitions'] == 'weekly':
     transitions = pd.read_csv("new_feb-mar_data/pilot_transitions_5months.csv")#"may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")#"outputs/pilot_transitions_5months.csv")
@@ -820,7 +822,7 @@ def run_and_repeat(beneficiaries, transitions, call_data, CONFIG, features_datas
 
     return np.mean(np.stack(all_results, axis=0), axis=0), np.mean(np.stack(all_notes, axis=0), axis=0)
 
-run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, 'feb16-mar15_data', beneficiary_data)
+run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, pilot_folder, beneficiary_data)
 
 # results, avgs = run_and_repeat(beneficiary_splits, transitions, call_data, CONFIG, features_dataset)
 # print("-"*60)
