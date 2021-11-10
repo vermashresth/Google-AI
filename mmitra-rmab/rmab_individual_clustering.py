@@ -30,19 +30,27 @@ from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
 from tensorflow.keras.models import load_model
 from training.modelling.dataloader import get_train_val_test
 
-stats = pd.read_csv("may_data/beneficiary_stats_v5.csv")
-beneficiary_data = pd.read_csv("may_data/beneficiary/AIRegistration-20200501-20200731.csv")
-b_data, call_data = load_data("may_data")
+stats = pd.read_csv("new_feb-mar_data/train_feb-mar.csv")#"beneficiary_stats.csv")#"may_data/beneficiary_stats_v5.csv")
+beneficiary_data = pd.read_csv("new_feb-mar_data/beneficiary/ai_registration-20210216-20210315.csv")#"feb16-mar15_data/beneficiary/ai_registration-20210216-20210315.csv")#"may_data/beneficiary/AIRegistration-20200501-20200731.csv")
+b_data, call_data = load_data("new_feb-mar_data")#"may_data")
 call_data = _preprocess_call_data(call_data)
-all_beneficiaries = stats[stats['Group'].isin(["Google-AI-Control", "Google-AI-Calls"])]
+all_beneficiaries = stats#stats[stats['Group'].isin(["Google-AI-Control", "Google-AI-Calls"])]
+features_dataset = preprocess_and_make_dataset(b_data, call_data)
+user_ids, dynamic_xs, gest_ages, static_xs, ngo_hosp_ids, labels = features_dataset
+enroll_gest_age_mean = np.mean(features_dataset[3][:, 0])
+days_to_first_call_mean = np.mean(features_dataset[3][:, 7])
 
-# features_dataset = preprocess_and_make_dataset(b_data, call_data)
-with open('may_data/features_dataset.pkl', 'rb') as fw:
-    features_dataset = pickle.load(fw)
-fw.close()
-# exit()
+# dynamic features preprocessing
+dynamic_xs = dynamic_xs.astype(np.float32)
+dynamic_xs[:, :, 2] = dynamic_xs[:, :, 2] / 60
+dynamic_xs[:, :, 3] = dynamic_xs[:, :, 3] / 60
+dynamic_xs[:, :, 4] = dynamic_xs[:, :, 4] / 12
 
-# beneficiary_splits = load_obj("may_data/RMAB_one_month/weekly_beneficiary_splits_single_group.pkl")
+static_xs = static_xs.astype(np.float32)
+static_xs[:, 0] = (static_xs[:, 0] - enroll_gest_age_mean)
+static_xs[:, 7] = (static_xs[:, 7] - days_to_first_call_mean)
+
+features_dataset = user_ids, dynamic_xs, gest_ages, static_xs, ngo_hosp_ids, labels
 
 aug_states = []
 for i in range(6):
@@ -59,16 +67,13 @@ CONFIG = {
     },
     "time_step": 7,
     "gamma": 0.99,
-    "clusters": int(sys.argv[1]),
+    "clusters": 0,
     "transitions": "weekly",
-    "clustering": sys.argv[2],
-    "pilot_start_date": sys.argv[3]
+    "clustering": "kmeans"
 }
 
 if CONFIG['transitions'] == 'weekly':
-    transitions = pd.read_csv("may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")
-else:
-    transitions = pd.read_csv("may_data/RMAB_one_month/transitions_SI_single_group.csv")
+    transitions = pd.read_csv("new_feb-mar_data/pilot_transitions_5months.csv")#"may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")#"outputs/pilot_transitions_5months.csv")
 
 def kmeans_missing(X, n_clusters, max_iter=10):
     n_clusters = CONFIG['clusters']
@@ -456,7 +461,7 @@ def plan(transition_probabilities, CONFIG):
         t_probs[4 : 6, 6 : 8, 1] = two_state_probs[:, :, 0]
         t_probs[6 : 8, 0 : 2, 1] = two_state_probs[:, :, 1]
 
-        ipdb.set_trace()
+        #ipdb.set_trace()
 
         max_q_diff = np.inf
         prev_m_values, m_values = None, None
@@ -585,14 +590,19 @@ def run_experiment(train_beneficiaries, train_transitions, test_beneficiaries, c
     return results, notes
 
 def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, pilot_data, beneficiary_data):
+    #GARGI
+    pilot_stats = pd.read_csv("new_feb-mar_data/test_feb-mar.csv")#GARGI
     pilot_beneficiary_data, pilot_call_data = load_data(pilot_data)
     inf_dataset = preprocess_and_make_dataset(pilot_beneficiary_data, pilot_call_data)
     pilot_call_data = _preprocess_call_data(pilot_call_data)
     pilot_user_ids, pilot_dynamic_xs, pilot_gest_age, pilot_static_xs, pilot_hosp_id, pilot_labels = inf_dataset
-    pilot_gold_e2c = pilot_labels[:, 3] / pilot_labels[:, 2]
-    pilot_gold_e2c_processed = np.nan_to_num(pilot_gold_e2c)
-    pilot_gold_labels = (pilot_gold_e2c_processed < 0.5) * 1.0
-    pilot_gold_labels = pilot_gold_labels.astype(np.int)
+    pilot_test_ids = pilot_stats['user_id']
+    pilot_idxes = [np.where(pilot_user_ids == x)[0][0] for x in pilot_test_ids]
+    pilot_static_xs = pilot_static_xs[pilot_idxes]
+    # pilot_gold_e2c = pilot_labels[:, 3] / pilot_labels[:, 2]
+    # pilot_gold_e2c_processed = np.nan_to_num(pilot_gold_e2c)
+    # pilot_gold_labels = (pilot_gold_e2c_processed < 0.5) * 1.0
+    # pilot_gold_labels = pilot_gold_labels.astype(np.int)
 
     # ipdb.set_trace()
 
@@ -616,12 +626,12 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         'Precision': Precision,
         'Recall': Recall
     }
-
-    model = load_model(os.path.join("models", 'lstm_model_final', "model"), custom_objects=dependencies)
-    output_probs = model.predict(x=[pilot_static_xs, pilot_dynamic_xs, pilot_hosp_id, pilot_gest_age])
-    out_lstm_labels = (output_probs >= 0.5).astype(np.int)
-    low_eng_idxes = np.where(out_lstm_labels == 1)[0]
-    low_eng_user_ids = np.array(pilot_user_ids)[low_eng_idxes]
+    #GARGI
+    # model = load_model(os.path.join("models", 'lstm_model_final', "model"), custom_objects=dependencies)
+    # output_probs = model.predict(x=[pilot_static_xs, pilot_dynamic_xs, pilot_hosp_id, pilot_gest_age])
+    # out_lstm_labels = (output_probs >= 0.5).astype(np.int)
+    # low_eng_idxes = np.where(out_lstm_labels == 1)[0]
+    # low_eng_user_ids = np.array(pilot_user_ids)[low_eng_idxes]
     pilot_static_features = np.array(pilot_static_xs, dtype=np.float)
     pilot_static_features = pilot_static_features[:, : -8]
 
@@ -647,7 +657,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         else:
             cluster_transition_probabilities[cols[i]] = 1 - cluster_transition_probabilities[cols[i - 1]]
 
-    ipdb.set_trace()
+    #ipdb.set_trace()
 
     train_b_ids = train_beneficiaries['user_id'].to_list()
     cluster_transition_probabilities['mean_squared_error'] = 0.0
@@ -693,15 +703,15 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         cluster_transition_probabilities.loc[cluster_transition_probabilities['cluster'] == user_cluster, 'mean_squared_error'] = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == user_cluster]['mean_squared_error'].item() + mse_val
     
     print(total_mse, total_count, total_mse / total_count)
-    # cluster_transition_probabilities.to_csv('outputs/individual_clustering/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
-    exit()
+    cluster_transition_probabilities.to_csv('outputs/individual_clustering/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
+    #exit()
 
     ground_truth = np.array(ground_truth)
     with open('gt_beneficiary_probs.pkl', 'wb') as fr:
         pickle.dump(ground_truth, fr)
     fr.close()
 
-    ipdb.set_trace()
+    #ipdb.set_trace()
     # cluster_transition_probabilities['P(L] = cluster_transition_probabilities.fillna(cluster_transition_probabilities.mean())
     q_values, m_values = plan(cluster_transition_probabilities, CONFIG)
 
@@ -715,8 +725,8 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     pilot_cluster_predictions = cls.predict(pilot_static_features)
 
-    whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'lstm_prediction': [], 'gold_e2c': [], 'gold_label': [], 'registration_date': [], 'current_E2C': []}
-    for idx, puser_id in enumerate(pilot_user_ids):
+    whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'registration_date': [], 'current_E2C': []}#, 'lstm_prediction': [], 'gold_e2c': [], 'gold_label': [], 'registration_date': [], 'current_E2C': []} #GARGI
+    for idx, puser_id in enumerate(pilot_test_ids):#pilot_user_ids): #GARGI
         pilot_date_num = (pd.to_datetime(CONFIG['pilot_start_date'], format="%Y-%m-%d") - pd.to_datetime("2018-01-01", format="%Y-%m-%d")).days
 
         if CONFIG['transitions'] == 'weekly':
@@ -756,15 +766,16 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
             whittle_indices['start_state'].append('NE')
         elif curr_state == 6:
             whittle_indices['start_state'].append('E')
-        if out_lstm_labels[idx] == 0:
-            whittle_indices['lstm_prediction'].append('high_engagement')
-        elif out_lstm_labels[idx] == 1:
-            whittle_indices['lstm_prediction'].append('low_engagement')
-        whittle_indices['gold_e2c'].append(pilot_gold_e2c[idx])
-        if pilot_gold_labels[idx] == 0:
-            whittle_indices['gold_label'].append('high_engagement')
-        elif pilot_gold_labels[idx] == 1:
-            whittle_indices['gold_label'].append('low_engagement')
+        #GARGI
+        # if out_lstm_labels[idx] == 0:
+        #     whittle_indices['lstm_prediction'].append('high_engagement')
+        # elif out_lstm_labels[idx] == 1:
+        #     whittle_indices['lstm_prediction'].append('low_engagement')
+        # whittle_indices['gold_e2c'].append(pilot_gold_e2c[idx])
+        # if pilot_gold_labels[idx] == 0:
+        #     whittle_indices['gold_label'].append('high_engagement')
+        # elif pilot_gold_labels[idx] == 1:
+        #     whittle_indices['gold_label'].append('low_engagement')
         
         all_days_calls = pilot_call_data[
             (pilot_call_data['user_id'] == puser_id)
@@ -780,6 +791,10 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
         whittle_indices['registration_date'].append(regis_date)
 
+    with open('policy_dump.pkl', 'wb') as fr:
+        policy = pilot_test_ids, pilot_static_features, cls, cluster_transition_probabilities, m_values, q_values
+        pickle.dump(policy, fr)
+    fr.close()
 
     df = pd.DataFrame(whittle_indices)
     df = df.sort_values('whittle_index', ascending=False)
