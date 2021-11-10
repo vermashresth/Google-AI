@@ -67,9 +67,10 @@ CONFIG = {
     },
     "time_step": 7,
     "gamma": 0.99,
-    "clusters": 0,
+    "clusters": int(sys.argv[1]),
     "transitions": "weekly",
-    "clustering": "kmeans"
+    "clustering": sys.argv[2],
+    "pilot_start_date": sys.argv[3]
 }
 
 if CONFIG['transitions'] == 'weekly':
