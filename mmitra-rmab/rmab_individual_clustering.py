@@ -187,9 +187,9 @@ def run_third_pilot(CONFIG):
     df = pd.DataFrame(whittle_indices)
     df = df.sort_values('whittle_index', ascending=False)
     
-    df_ = df[df['start_state']=='NE']
-    df_ = df_[:CONFIG["interventions"]]
-    df_ = df_['user_id']
+    df__ = df[df['start_state']=='NE']
+    df__ = df__[:CONFIG["interventions"]]
+    df__ = df__['user_id']
     if CONFIG['read_sql']:
         query = "INSERT INTO intervention_header (interventiontype_id, start_date) VALUES (%s, %s)"
         val = (2,CONFIG["pilot_start_date"])
@@ -203,7 +203,7 @@ def run_third_pilot(CONFIG):
         id_ = df_["intervention_id"].to_list()
         id_ = id_[0]
         query = "INSERT INTO intervention_list (intervention_id, beneficiary_id) VALUES (%s, %s);"
-        users = df_['user_id'].to_list()
+        users = df__['user_id'].to_list()
         val = []
         for i in range(len(users)):
           val.append((id_,users[i]))
