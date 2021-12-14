@@ -35,7 +35,7 @@ BENEFICIARY_COLUMNS = [
     "p",
     "s",
     "l",
-    "a",
+#    "a",
 ]
 
 
@@ -80,9 +80,10 @@ def _merge_beneficiary_files(
     FROM vw_beneficiaries u\
     LEFT OUTER JOIN call_slot csl ON csl.call_slot_id = u.call_slot_id\
     LEFT OUTER JOIN channels c ON c.channel_id = u.channel_id\
-    WHERE u.isactive = 1 AND registration_date >= '2021-02-16'\
+    WHERE u.isactive = 1 AND registration_date >= '"+str(CONFIG["from_registration_date"])+"'\
     ORDER BY u.beneficiary_id;"
     df = pd.read_sql(query, cnxn)
+    #df.to_csv("beneficiary_data.csv")
     df = df[BENEFICIARY_COLUMNS]
     for i in list(converters.keys()):
         df[i] = df[i].apply(converters[i])
@@ -105,7 +106,7 @@ def _merge_beneficiary_files(
                  engine="python",
                  error_bad_lines=False,
                  warn_bad_lines=False,
-                 sep='\t'
+ #                sep='\t'
              )
              for f in file_list
         ],
