@@ -55,7 +55,7 @@ def _preprocess_beneficiary_data(data, call_data):
         "p": (0, 5, -1),
         "s": (0, 1, -1),
         "l": (0, 5, -1),
-        "a": (0, 2, -1),
+    #    "a": (0, 2, -1),
     }
     for col in valid_ranges.keys():
         min_val, max_val, replace_val = valid_ranges[col]
@@ -105,7 +105,7 @@ def _preprocess_beneficiary_data(data, call_data):
         "p",
         "s",
         "l",
-        "a",
+    #    "a",
         "days_to_first_call",
         "age_0",
         "age_1",
