@@ -110,8 +110,9 @@ def _merge_call_files(
     cursor = cnxn.cursor()
     query = "SELECT beneficiary_id user_id, startdatetime, enddatetime, duration, gest_age, dropreason, call_status_id callStatus, missed_call_id missedcall_id, media_id, esb_trans_id, tsp_id\
     FROM vw_call_logs\
-    WHERE startdatetime < '"+str(start_date)+"' AND startdatetime >= '2021-02-16';"
+    WHERE startdatetime < '"+str(start_date)+"' AND startdatetime >= '"+str(CONFIG["from_registration_date"])+"';"
     df = pd.read_sql(query, cnxn)
+    #df.to_csv("call_data.csv")
     df = df[CALL_COLUMNS]
     data = pd.concat(
         [   
@@ -130,7 +131,7 @@ def _merge_call_files(
                  engine="python",
                  error_bad_lines=False,
                  warn_bad_lines=False,
-                 sep='\t'
+ #                sep='\t'
              )
              for f in tqdm(filelist)
         ],
