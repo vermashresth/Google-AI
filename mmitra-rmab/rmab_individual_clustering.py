@@ -45,13 +45,17 @@ CONFIG = {
     },
     "time_step": 7,
     "gamma": 0.99,
-    "clusters": 40,
+    "clusters": 75,
     "transitions": "weekly",
     "clustering": "kmeans",
     "pilot_start_date": sys.argv[1],
     "pilot_data": "data",
     "interventions": int(sys.argv[2]),
-    "read_sql": int(sys.argv[3])
+    "read_sql": int(sys.argv[3]),
+    "from_registration_date": sys.argv[4],
+    "user_id": sys.argv[5],
+    "password": sys.argv[6]
+
 }
 
 def run_third_pilot(CONFIG):
@@ -62,7 +66,7 @@ def run_third_pilot(CONFIG):
     pilot_user_ids, pilot_dynamic_xs, pilot_gest_age, pilot_static_xs, pilot_hosp_id, pilot_labels = inf_dataset
 
     enroll_gest_age_mean = np.mean(inf_dataset[3][:, 0])
-    days_to_first_call_mean = np.mean(inf_dataset[3][:, 7])
+    days_to_first_call_mean = np.mean(inf_dataset[3][:, 6])#7])
 
     # dynamic features preprocessing
     pilot_dynamic_xs = pilot_dynamic_xs.astype(np.float32)
@@ -73,7 +77,7 @@ def run_third_pilot(CONFIG):
     # static features preprocessing
     pilot_static_xs = pilot_static_xs.astype(np.float32)
     pilot_static_xs[:, 0] = (pilot_static_xs[:, 0] - enroll_gest_age_mean)
-    pilot_static_xs[:, 7] = (pilot_static_xs[:, 7] - days_to_first_call_mean)
+    pilot_static_xs[:, 6] = (pilot_static_xs[:, 6] - days_to_first_call_mean)
 
     dependencies = {
         'BinaryAccuracy': BinaryAccuracy,
@@ -98,8 +102,8 @@ def run_third_pilot(CONFIG):
       from mysql.connector.constants import ClientFlag
 #      import pandas as pd
       config = {
-          'user': 'googleai',
-          'password': '4UY(@{SqH{',
+          'user': CONFIG["user_id"],
+          'password': CONFIG["password"],
           'host': '34.93.237.61',
           'client_flags': [ClientFlag.SSL]
       }
@@ -187,8 +191,8 @@ def run_third_pilot(CONFIG):
     df = pd.DataFrame(whittle_indices)
     df = df.sort_values('whittle_index', ascending=False)
     
-    df__ = df[df['start_state']=='NE']
-    df__ = df__[:CONFIG["interventions"]]
+    #df__ = df[df['start_state']=='NE']
+    df__ = df[:CONFIG["interventions"]]
     df__ = df__['user_id']
     if CONFIG['read_sql']:
         query = "INSERT INTO intervention_header (interventiontype_id, start_date) VALUES (%s, %s)"
@@ -211,7 +215,7 @@ def run_third_pilot(CONFIG):
         cnxn.commit()
     else:
         df.to_csv('checking_{}_{}_pilot_stats_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
-        df_.to_csv('user_interventions.csv', index=False, header=False)
+        df__.to_csv('user_interventions.csv', index=False, header=False)
     return
 
 run_third_pilot(CONFIG)
