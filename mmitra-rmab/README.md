@@ -3,7 +3,7 @@
 **Terminal steps:**<br/>
 For SQL within python:<br/>
 unzip policy.zip<br/>
-pip install -r requirements.txt
+pip install -r requirements.txt<br/>
 python rmab_individual_clustering.py <start_date> <#interventions> 1 <from_registration_date> <br/>
 
 For explicit procedure:<br/>
