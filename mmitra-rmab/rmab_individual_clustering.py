@@ -195,8 +195,8 @@ def run_third_pilot(CONFIG):
     df__ = df[:CONFIG["interventions"]]
     df__ = df__['user_id']
     if CONFIG['read_sql']:
-        query = "INSERT INTO intervention_header (interventiontype_id, start_date) VALUES (%s, %s)"
-        val = (2,CONFIG["pilot_start_date"])
+        query = "INSERT INTO intervention_header (interventiontype_id, start_date, batch_count, from_registration_date) VALUES (%s, %s, %s, %s)"
+        val = (2, CONFIG["pilot_start_date"], CONFIG["interventions"], CONFIG["from_registration_date"])
         cursor.execute(query, val)
         cnxn.commit()
         query = "SELECT * FROM intervention_header;"
