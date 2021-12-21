@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 import tqdm
-from dfl.policy import getActionProb, getProbs
+from dfl.policy import getActionProb, getActionProbNaive, getProbs
 from dfl.config import dim_dict, policy_map
 
 def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
@@ -99,3 +99,48 @@ def opeIS_parallel(state_record, action_record, w, mask, n_benefs, T, K, n_trial
     ope = tf.reduce_sum(ope) / ntr
     return ope
 
+def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
+    compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}
+    gamma_series = np.array([gamma**(t-1) for t in range(T-1)])
+
+    v = []
+    for trial in range(n_trials):
+        imp_weight = 1
+        v_tau = 0
+        for ts in range(T-1):
+            a_t = traj[trial, # trial index
+                            compare['beh'], # policy index
+                            ts, # time index
+                            dim_dict['action'], # tuple dimension
+                            : # benef index
+                            ].astype(int)
+            # a_t_encoded = encode_vector(a_t, N_ACTIONS)
+
+            s_t = traj[trial, # trial index
+                            compare['beh'], # policy index
+                            ts, # time index
+                            dim_dict['state'], # tuple dimension
+                            : # benef index
+                            ].astype(int)
+            # s_t_encoded = encode_vector(s_t, N_STATES)
+
+            pi_tar = getActionProbNaive(s_t, a_t, policy=compare['target'],
+                                        w=w[mask], k=K, N=n_benefs)
+            pi_beh = getActionProbNaive(s_t, a_t, policy=compare['beh'],
+                                        w=w[mask], k=K, N=n_benefs)
+
+            imp_weight*= pi_tar/pi_beh
+            # if imp_weight>1:
+            #     print('weight: ', imp_weight)
+            v_t_tau = gamma_series[ts] * traj[trial, # trial index
+                                            compare['beh'], # policy index
+                                            ts, # time index
+                                            dim_dict['reward'], # tuple dimension
+                                            : # benef index
+                                            ].sum() * imp_weight
+            v_tau += v_t_tau
+  
+    v.append(v_tau)
+    ope = np.mean(v)
+    print(f'OPE Naive: {ope}')
+    return ope
