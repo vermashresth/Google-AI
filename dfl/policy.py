@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from armman.simulator import getTopk
 from dfl.config import dim_dict, policy_map
-from utils import getSoftTopk, DiffTopK
+from dfl.utils import getSoftTopk, DiffTopK
 
 WHITTLE_EPS = 1e-2
 
