@@ -3,7 +3,7 @@ import pandas as pd
 import argparse
 import tqdm
 
-from dfl.config import policy_names, dim_dict, s_vals, a_vals
+from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
 from dfl.policy import getActions
 from dfl.utils import getBenefsByCluster
 from armman.simulator import takeActions
@@ -75,7 +75,7 @@ def simulateTrajectories(args, T=None, w=None, start_state=None):
   return simulated_rewards, state_record, action_record, np.array(traj)
 
 
-def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10, T_data=None, w=None, start_state=None, debug=False, replace=True):
+def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10, T_data=None, w=None, start_state=None, debug=False, replace=False):
     parser = argparse.ArgumentParser(description='Inputs to engagement simulator module')
     parser.add_argument('-N', '--num_beneficiaries', default=7000, type=int, help='Number of Beneficiaries')
     parser.add_argument('-k', '--num_resources', default=1400, type=int, help='Number of calls available per day')
@@ -125,18 +125,64 @@ def getBenefsEmpProbs(traj, benef_ids, policy_id, trial_id, min_sup = 1, decompo
                                 'a': a_traj,
                                 'a_prime': a_prime_traj}), ignore_index=True)
     if decomposed:
-        emp_prob, has_missing_values = getEmpProbsDecomposed(transitions_df, min_sup)
+        emp_prob, aux_dict = getEmpProbsDecomposed(transitions_df, min_sup)
     else:
-        emp_prob, has_missing_values = getEmpProbs(transitions_df, min_sup)
+        emp_prob, aux_dict = getEmpProbs(transitions_df, min_sup)
 
                         
-    return transitions_df, emp_prob, has_missing_values
+    return transitions_df, emp_prob, aux_dict
 
 
 def getEmpProbs(transitions_df, min_sup = 1):
     emp_prob = {}
     has_missing_values = False
     # Prune Logic
+    transitions_df = transitions_df.copy()
+    # print(transitions_df)
+    while True:
+        last_row = transitions_df.iloc[-1]
+        last_s_prime_a_prime = last_row[['s_prime', 'a_prime']]
+        # print(last_s_prime_a_prime.values)
+        # print(transitions_df[['s', 'a']].values)
+        match_bool = transitions_df[['s', 'a']].values==last_s_prime_a_prime.values
+        # print(transitions_df)
+        if 2 in np.sum(match_bool, axis=1): # There is some s, a matching last s_prime, a_prime
+            break
+        else:
+            # print(match_bool)
+            # print(transitions_df[['s', 'a']].values)
+            # print(last_s_prime_a_prime.values)
+            # print(transitions_df[['s', 'a', 's_prime', 'a_prime']])
+            transitions_df = transitions_df.iloc[:-1]
+            print('Pruned Transitions to length ', transitions_df.shape)
+
+    for s in S_VALS:
+        for a in A_VALS:
+            s_a = transitions_df[(transitions_df['s']==s) &
+                                    (transitions_df['a']==a)
+                                ]
+            s_a_count = s_a.shape[0]
+            key = (s, a)
+            emp_prob[key] = {}
+            for s_prime in S_VALS:
+                for a_prime in A_VALS:
+                    s_a_s_prime_a_prime = s_a[(s_a['s_prime']==s_prime) &
+                                                    (s_a['a_prime']==a_prime)
+                                                ]
+                    s_a_s_prime_a_prime_count = s_a_s_prime_a_prime.shape[0]
+                    options_key = (s_prime, a_prime)
+                    if s_a_count >= min_sup:
+                        emp_prob[key][options_key] = s_a_s_prime_a_prime_count/s_a_count
+                    else:
+                        emp_prob[key][options_key] = None
+                        has_missing_values = True
+                        
+    return emp_prob, {'s_a_s_prime_dict': {}, 'has_missing_values': has_missing_values}
+
+def getEmpProbsDecomposed(transitions_df, min_sup = 1):
+    emp_prob = {}
+    has_missing_values = False
+
     transitions_df = transitions_df.copy()
     
     while True:
@@ -156,35 +202,9 @@ def getEmpProbs(transitions_df, min_sup = 1):
             transitions_df = transitions_df.iloc[:-1]
             print('Pruned Transitions to length ', transitions_df.shape)
 
-    for s in s_vals:
-        for a in a_vals:
-            s_a = transitions_df[(transitions_df['s']==s) &
-                                    (transitions_df['a']==a)
-                                ]
-            s_a_count = s_a.shape[0]
-            key = (s, a)
-            emp_prob[key] = {}
-            for s_prime in s_vals:
-                for a_prime in a_vals:
-                    s_a_s_prime_a_prime = s_a[(s_a['s_prime']==s_prime) &
-                                                    (s_a['a_prime']==a_prime)
-                                                ]
-                    s_a_s_prime_a_prime_count = s_a_s_prime_a_prime.shape[0]
-                    options_key = (s_prime, a_prime)
-                    if s_a_count >= min_sup:
-                        emp_prob[key][options_key] = s_a_s_prime_a_prime_count/s_a_count
-                    else:
-                        emp_prob[key][options_key] = None
-                        has_missing_values = True
-                        
-    return emp_prob, has_missing_values
-
-def getEmpProbsDecomposed(transitions_df, min_sup = 1):
-    emp_prob = {}
-    has_missing_values = False
-    for s in s_vals:
+    for s in S_VALS:
         emp_prob[(s)] = {}
-        for a in a_vals:
+        for a in A_VALS:
             s_ = transitions_df[(transitions_df['s']==s)
                                 ]
             s_count = s_.shape[0]
@@ -194,7 +214,7 @@ def getEmpProbsDecomposed(transitions_df, min_sup = 1):
             s_a_count = s_a.shape[0]
             key = (s, a)
             emp_prob[key] = {}
-            for s_prime in s_vals:
+            for s_prime in S_VALS:
                 s_a_s_prime = s_a[(s_a['s_prime']==s_prime)
                                             ]
                 s_a_s_prime_count = s_a_s_prime.shape[0]
@@ -209,11 +229,11 @@ def getEmpProbsDecomposed(transitions_df, min_sup = 1):
             else:
                 emp_prob[(s)][(a)] = None
     new_emp_prob = {}
-    for s in s_vals:
-        for a in a_vals:
+    for s in S_VALS:
+        for a in A_VALS:
             new_emp_prob[(s, a)] = {}
-            for s_prime in s_vals:
-                for a_prime in a_vals:
+            for s_prime in S_VALS:
+                for a_prime in A_VALS:
                     if  emp_prob[(s, a)][s_prime] is None or emp_prob[(s_prime)][a_prime] is None:
                         new_emp_prob[(s, a)][(s_prime, a_prime)] = 0
                     else:
@@ -221,7 +241,7 @@ def getEmpProbsDecomposed(transitions_df, min_sup = 1):
                                                            emp_prob[(s_prime)][a_prime]
 
                         
-    return new_emp_prob, has_missing_values
+    return new_emp_prob, {'s_a_s_prime_dict': emp_prob , 'has_missing_values': has_missing_values}
 
 def getEmpProbClusterLookup(traj, policy_id, trial_id, cluster_ids, decomposed):
     emp_prob_by_cluster = {}
@@ -235,12 +255,14 @@ def getEmpProbClusterLookup(traj, policy_id, trial_id, cluster_ids, decomposed):
 
 def getEmpProbBenefLookup(traj, policy_id, trial_id, n_benefs, decomposed):
     emp_prob_by_benef = {}
+    aux_dict_by_benef = {}
     transitions_list = []
     for benef in tqdm.tqdm(range(n_benefs), desc='Emp Prob'):
-        transitions_df, emp_prob, has_missing_values = getBenefsEmpProbs(traj, [benef], policy_id, trial_id, min_sup = 1, decomposed=decomposed)
+        transitions_df, emp_prob, aux_dict = getBenefsEmpProbs(traj, [benef], policy_id, trial_id, min_sup = 1, decomposed=decomposed)
         emp_prob_by_benef[benef] = emp_prob
+        aux_dict_by_benef[benef] = aux_dict
         transitions_list.append(transitions_df)
-    return emp_prob_by_benef, transitions_list
+    return emp_prob_by_benef, transitions_list, aux_dict_by_benef
 
 def imputeEmpProb(options):
     for k in options:
@@ -248,21 +270,27 @@ def imputeEmpProb(options):
             options[k] = 0.25
     return options
 
-def to_prune(true_count_df, aug_count_dict, percent):
+def to_prune(true_count_df, aug_count_dict, percent=0.6):
     for key in aug_count_dict:
-        true = true_count_df.loc[key]
+        if key in true_count_df.index:
+            true = true_count_df.loc[key]
+        else:
+            continue
         aug = aug_count_dict[key]
-        if np.fabs(true-aug) > true*percent:
+        # print(np.fabs(true-aug), np.round(true*percent), true)
+        if np.fabs(true-aug) > max(1, np.round(true*percent)):
             return True
     return False
 
-def augmentTraj(traj, true_traj_dfs, policy_id, trial_id, emp_prob_lookup, lookup_by_cluster, n_aug_traj, T, n_benefs, cluster_ids):
+def augmentTraj(traj, true_traj_dfs, policy_id, trial_id, emp_prob_lookup, lookup_by_cluster, n_aug_traj, T, n_benefs, cluster_ids, do_prune=False):
     aug_traj = np.zeros((n_aug_traj, 1, T-1, len(dim_dict), n_benefs))
     for aug_traj_i in tqdm.tqdm(range(n_aug_traj), desc='Augment Trajectory'):
         for benef in range(n_benefs):
             retry = True
             true_traj_df = true_traj_dfs[benef][['s', 'a', 's_prime', 'a_prime']]
             true_count_df = pd.Series([str(tuple(i)) for i in true_traj_df.values.astype(int)]).value_counts()
+            # print('true traj df ', true_traj_df)
+            # print('true count df ', true_count_df)
             while retry:
                 count_dict = defaultdict(lambda: 0)
                 s, a = traj[trial_id, # trial index
@@ -280,7 +308,7 @@ def augmentTraj(traj, true_traj_dfs, policy_id, trial_id, emp_prob_lookup, looku
 
                 for ts in range(T-1):
                     options = emp_prob[(s, a)]
-                    
+                    # print(options)
                     # options = imputeEmpProb(options)
                     choice = np.random.choice(np.arange(len(list(options.keys()))),
                                                 p=list(options.values()))
@@ -291,7 +319,8 @@ def augmentTraj(traj, true_traj_dfs, policy_id, trial_id, emp_prob_lookup, looku
                     aug_traj[aug_traj_i, 0, ts, dim_dict['reward'], benef] = s
                     count_dict[str(tuple([int(s), int(a), int(s_prime), int(a_prime)]))]+=1
                     s, a = s_prime, a_prime
-                retry = to_prune(true_count_df, count_dict, 0.5)
+                # print('count aug ', count_dict)
+                retry = to_prune(true_count_df, count_dict, do_prune) and do_prune
                 # print(benef, retry)
                     
     print('Generated Augmented Traj of shape: ', aug_traj.shape)

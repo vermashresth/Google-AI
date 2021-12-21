@@ -43,6 +43,8 @@ def run_all_synthetic(T_data, w, cluster_ids):
     aug_traj_schedule = [10, 100, 1000]
     n_aug_traj = max(aug_traj_schedule)
     
+    p_pruned_schedules = [0.3, 0.6]
+
     result_df = pd.DataFrame()
     
     result_dict = {}
@@ -62,7 +64,9 @@ def run_all_synthetic(T_data, w, cluster_ids):
         opeIS_decomposed = opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma,
                     target_policy_name, beh_policy_name)
         
-        emp_prob_by_benef, tr_df_benef = getEmpProbBenefLookup(traj, policy_id, trial_id, n_benefs, False)
+        emp_prob_by_benef, tr_df_benef, _ = getEmpProbBenefLookup(traj, policy_id, trial_id, n_benefs, False)
+        emp_prob_by_benef_ssa, tr_df_benef_ssa, aux_dict_ssa = getEmpProbBenefLookup(traj, policy_id, trial_id, n_benefs, True)
+
 
         # masked_cluster_ids = np.array(cluster_ids)[mask]
         # emp_prob_by_cluster, tr_df_cluster = getEmpProbClusterLookup(traj, policy_id, trial_id, masked_cluster_ids, False)
@@ -71,6 +75,23 @@ def run_all_synthetic(T_data, w, cluster_ids):
         benef_level_aug_traj = augmentTraj(traj, tr_df_benef, policy_id, trial_id,
                                           emp_prob_by_benef, False, n_aug_traj,
                                           T, n_benefs, cluster_ids=None)
+        benef_level_aug_traj_ssa = augmentTraj(traj, tr_df_benef_ssa, policy_id, trial_id,
+                                          emp_prob_by_benef_ssa, False, n_aug_traj,
+                                          T, n_benefs, cluster_ids=None)
+        benef_level_aug_traj_pruned_list = []
+        benef_level_aug_traj_ssa_pruned_list = []
+
+        for p in p_pruned_schedules:
+            benef_level_aug_traj_pruned = augmentTraj(traj, tr_df_benef, policy_id, trial_id,
+                                            emp_prob_by_benef, False, n_aug_traj,
+                                            T, n_benefs, cluster_ids=None, do_prune=p)
+            benef_level_aug_traj_pruned_list.append(benef_level_aug_traj_pruned)
+            
+            benef_level_aug_traj_ssa_pruned = augmentTraj(traj, tr_df_benef_ssa, policy_id, trial_id,
+                                            emp_prob_by_benef_ssa, False, n_aug_traj,
+                                            T, n_benefs, cluster_ids=None, do_prune=p)
+            benef_level_aug_traj_ssa_pruned_list.append(benef_level_aug_traj_ssa_pruned)
+
         # cluster_level_aug_traj = augmentTraj(traj, policy_id, trial_id,
         #                           emp_prob_by_cluster, True, n_aug_traj,
         #                           T, n_benefs, masked_cluster_ids)
@@ -86,15 +107,33 @@ def run_all_synthetic(T_data, w, cluster_ids):
                                                traj_sample_size, replace=False)
 
             aug_traj_subset = benef_level_aug_traj[traj_idx_sample]
+            aug_traj_subset_ssa = benef_level_aug_traj_ssa[traj_idx_sample]
             
             opeIS_stitched_i = opeIS(aug_traj_subset, w, mask, n_benefs, T, K,
                                      traj_sample_size, gamma, target_policy_name, beh_policy_name)
+            opeIS_stitched_i_ssa = opeIS(aug_traj_subset_ssa, w, mask, n_benefs, T, K,
+                                        traj_sample_size, gamma, target_policy_name, beh_policy_name)
+
+            
+
+            result_dict[f'OPE_IS_stitched-{traj_sample_size}'] = opeIS_stitched_i
+            result_dict[f'OPE_IS_stitched-ssa-{traj_sample_size}'] = opeIS_stitched_i_ssa
+
+            for p_idx, p in enumerate(p_pruned_schedules):
+                aug_traj_subset_pruned = benef_level_aug_traj_pruned_list[p_idx][traj_idx_sample]
+                aug_traj_subset_ssa_pruned = benef_level_aug_traj_ssa_pruned_list[p_idx][traj_idx_sample]
+
+                opeIS_stitched_i_pruned = opeIS(aug_traj_subset_pruned, w, mask, n_benefs, T, K,
+                                     traj_sample_size, gamma, target_policy_name, beh_policy_name)
+                opeIS_stitched_i_ssa_pruned = opeIS(aug_traj_subset_ssa_pruned, w, mask, n_benefs, T, K,
+                                     traj_sample_size, gamma, target_policy_name, beh_policy_name)
+
+                result_dict[f'OPE_IS_stitched-pruned-p-{p}-{traj_sample_size}'] = opeIS_stitched_i_pruned
+                result_dict[f'OPE_IS_stitched-ssa-pruned-p-{p}-{traj_sample_size}'] = opeIS_stitched_i_ssa_pruned
             
             # aug_traj_subset = cluster_level_aug_traj[traj_idx_sample]
             # opeIS_similarity_i = opeIS(aug_traj_subset, w, mask, n_benefs, T, K,
             #                          traj_sample_size, gamma, target_policy_name, beh_policy_name)
-
-            result_dict[f'OPE_IS_stitched-{traj_sample_size}'] = opeIS_stitched_i
             # result_dict[f'similarity-{traj_sample_size}'] = opeIS_similarity_i
         
         result_df = result_df.append(result_dict, ignore_index=True)
