@@ -43,9 +43,7 @@ def run_all_synthetic(T_data, w, cluster_ids):
     aug_traj_schedule = [10, 100, 1000]
     n_aug_traj = max(aug_traj_schedule)
     
-    result_df = pd.DataFrame(columns=['seed', 'sim_random', 'sim_whittle', 'naive', 'decomposed']+\
-                                      [f'stitched-{i}' for i in aug_traj_schedule]+\
-                                      [f'similarity-{i}' for i in aug_traj_schedule])
+    result_df = pd.DataFrame()
     
     result_dict = {}
 
@@ -58,7 +56,11 @@ def run_all_synthetic(T_data, w, cluster_ids):
                                                         )
         
         
+        opeIS_naive = opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma,
+                    target_policy_name, beh_policy_name)
 
+        opeIS_decomposed = opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma,
+                    target_policy_name, beh_policy_name)
         
         emp_prob_by_benef, tr_df_benef = getEmpProbBenefLookup(traj, policy_id, trial_id, n_benefs, False)
 
@@ -72,11 +74,12 @@ def run_all_synthetic(T_data, w, cluster_ids):
         # cluster_level_aug_traj = augmentTraj(traj, policy_id, trial_id,
         #                           emp_prob_by_cluster, True, n_aug_traj,
         #                           T, n_benefs, masked_cluster_ids)
-        opeIS_naive = opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma,
-                    target_policy_name, beh_policy_name)
 
-        opeIS_decomposed = opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma,
-                    target_policy_name, beh_policy_name)
+        result_dict['seed'] = sim_seed
+        result_dict['TRUE_sim_random'] = simulated_rewards[trial_id][policy_map['random']]
+        result_dict['TRUE_sim_whittle'] = simulated_rewards[trial_id][policy_map['whittle']]
+        result_dict['OPE_IS_naive'] = opeIS_naive
+        result_dict['OPE_IS_decomposed'] = opeIS_decomposed
 
         for traj_sample_size in tqdm.tqdm(aug_traj_schedule):
             traj_idx_sample = np.random.choice(len(benef_level_aug_traj),
@@ -91,14 +94,8 @@ def run_all_synthetic(T_data, w, cluster_ids):
             # opeIS_similarity_i = opeIS(aug_traj_subset, w, mask, n_benefs, T, K,
             #                          traj_sample_size, gamma, target_policy_name, beh_policy_name)
 
-            result_dict[f'stitched-{traj_sample_size}'] = opeIS_stitched_i
+            result_dict[f'OPE_IS_stitched-{traj_sample_size}'] = opeIS_stitched_i
             # result_dict[f'similarity-{traj_sample_size}'] = opeIS_similarity_i
-            
-        result_dict['seed'] = sim_seed
-        result_dict['sim_random'] = simulated_rewards[trial_id][policy_map['random']]
-        result_dict['sim_whittle'] = simulated_rewards[trial_id][policy_map['whittle']]
-        result_dict['naive'] = opeIS_naive
-        result_dict['decomposed'] = opeIS_decomposed
         
         result_df = result_df.append(result_dict, ignore_index=True)
         result_df.to_csv('outputs/dfl/out.csv')
