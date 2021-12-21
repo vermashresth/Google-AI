@@ -11,6 +11,8 @@ import tensorflow as tf
 
 from itertools import combinations
 
+from dfl.config import N_ACTIONS, N_STATES
+
 def nck(n, k):
     return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
 
@@ -23,6 +25,17 @@ def getBenefsByCluster(cluster_id, cluster_ids):
     benefs = np.arange(len(cluster_ids))[np.array(cluster_ids)==cluster_id]
     return benefs
 
+def aux_dict_to_transition_matrix(aux_dict_ssa, n_benefs):
+    T_data = np.zeros((n_benefs, N_STATES, N_ACTIONS, N_STATES))
+    for benef in aux_dict_ssa.keys():
+        sub_dict = aux_dict_ssa[benef]['s_a_s_prime_dict']
+        keys = [k for k in sub_dict.keys() if isinstance(k, tuple)]
+        for (s, a) in keys:
+            for s_prime in sub_dict[(s, a)]:
+                prob = sub_dict[(s, a)][s_prime]
+                T_data[benef, s, a, s_prime] = prob
+    T_data[np.isnan(T_data)] = 1/N_STATES
+    return T_data
 
 """
 DIFFERENTIALBLE TOP-K LAYER
