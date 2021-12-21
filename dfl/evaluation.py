@@ -5,6 +5,7 @@ import tqdm
 from dfl.ope import opeIS, opeISNaive
 from dfl.trajectory import getSimulatedTrajectories
 from dfl.trajectory import getEmpProbBenefLookup, getEmpProbClusterLookup, augmentTraj
+from dfl.utils import aux_dict_to_transition_matrix
 from dfl.config import policy_map
 
 def evaluate_by_sample(aug_traj, n_samples, w, mask, n_benefs, T, K, traj_sample_size, gamma,
@@ -36,14 +37,16 @@ def run_all_synthetic(T_data, w, cluster_ids):
     policy_id = policy_map[beh_policy_name]
     trial_id = 0
     
-    n_sim_epochs = 5
+    n_sim_epochs = 3
     mask_seed = 0
     
     
-    aug_traj_schedule = [10, 100, 1000]
+    aug_traj_schedule = [10]
     n_aug_traj = max(aug_traj_schedule)
     
     p_pruned_schedules = [0.3, 0.6]
+    # p_pruned_schedules = []
+    OPE_sim_n_trials = 100
 
     result_df = pd.DataFrame()
     
@@ -136,6 +139,12 @@ def run_all_synthetic(T_data, w, cluster_ids):
             #                          traj_sample_size, gamma, target_policy_name, beh_policy_name)
             # result_dict[f'similarity-{traj_sample_size}'] = opeIS_similarity_i
         
+        est_T_data = aux_dict_to_transition_matrix(aux_dict_ssa, n_benefs)
+        _, OPE_sim_whittle, _, _, _, _ = getSimulatedTrajectories(
+                                                    n_benefs, T, K, OPE_sim_n_trials, gamma,
+                                                    sim_seed, mask_seed, est_T_data, w
+                                                    )
+        result_dict['OPE_sim_whittle'] = OPE_sim_whittle
         result_df = result_df.append(result_dict, ignore_index=True)
         result_df.to_csv('outputs/dfl/out.csv')
     return result_df
