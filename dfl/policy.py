@@ -110,6 +110,15 @@ def getProbSoftWhittle(states, benef, w, k, N):
     probs = gamma[0,:,0].numpy() * n
     return probs
     
+def getActionProbWhittleNaive(states, action, w, k):
+    WHITTLE_EPS = 1e-2
+    ts=None
+    whittle_actions = getActions(states, policy_map['whittle'], ts, w, k)
+    if np.array_equal(whittle_actions, action):
+        return 1-WHITTLE_EPS
+    else:
+        return WHITTLE_EPS
+    
 def getActionProbRandom(states, action, k, N):
     ## select k arms according to whittle indices
     N = len(states)
