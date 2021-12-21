@@ -7,3 +7,6 @@ dim_dict = {'state':0, 'action':1, 'new_state':2, 'reward':3}
 s_vals = [0, 1]
 a_vals = [0, 1]
 
+N_STATES = len(s_vals)
+N_ACTIONS = len(a_vals)
+
