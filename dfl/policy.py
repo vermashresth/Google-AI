@@ -2,7 +2,7 @@ import tensorflow as tf
 import numpy as np
 from armman.simulator import getTopk
 from dfl.config import dim_dict, policy_map
-from dfl.utils import getSoftTopk, DiffTopK
+from dfl.utils import getSoftTopk, DiffTopK, nck
 
 WHITTLE_EPS = 1e-2
 
@@ -71,6 +71,16 @@ def getActionProb(states, action, policy, benef, ts=None, w=None, k=None, N=None
         return getActionProbSoftWhittle(states, action, benef, w, k, N)
     else:
         raise f'Policy {policy} not supported'
+
+def getActionProbNaive(states, action, policy, w=None, k=None, N=None):
+    if policy==policy_map['random']:
+        return getActionProbRandomNaive(k, N)
+    elif policy==policy_map['rr']:
+        return getActionProbRandomNaive(k, N)
+    elif policy==policy_map['whittle']:
+        return getActionProbWhittleNaive(states, action, w, k)
+    else:
+        raise f'Policy {policy} not supported'
     
 def getActionProbWhittle(states, action, benef, w, k, N):
     ts=None
@@ -118,6 +128,9 @@ def getActionProbWhittleNaive(states, action, w, k):
         return 1-WHITTLE_EPS
     else:
         return WHITTLE_EPS
+
+def getActionProbRandomNaive(k, N):
+    return 1/nck(N, k)
     
 def getActionProbRandom(states, action, k, N):
     ## select k arms according to whittle indices

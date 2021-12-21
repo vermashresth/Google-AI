@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import tqdm
 
-from dfl.ope import opeIS
+from dfl.ope import opeIS, opeISNaive
 from dfl.trajectory import getSimulatedTrajectories
 from dfl.trajectory import getEmpProbBenefLookup, getEmpProbClusterLookup, augmentTraj
 from dfl.config import policy_map
@@ -72,7 +72,8 @@ def run_all_synthetic(T_data, w, cluster_ids):
         # cluster_level_aug_traj = augmentTraj(traj, policy_id, trial_id,
         #                           emp_prob_by_cluster, True, n_aug_traj,
         #                           T, n_benefs, masked_cluster_ids)
-        opeIS_naive = 0
+        opeIS_naive = opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma,
+                    target_policy_name, beh_policy_name)
 
         opeIS_decomposed = opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma,
                     target_policy_name, beh_policy_name)

@@ -66,10 +66,11 @@ def loadBeneficiaryData():
   fr.close()
 
   #engagement_matrix_file='full_matrix.pkl'
-  engagement_matrix_file='full_matrix_week11_end.pkl'
-  with open(engagement_matrix_file, 'rb') as fr:
-    engagement_matrix = pickle.load(fr)
-  fr.close()
+#   engagement_matrix_file='full_matrix_week11_end.pkl'
+#   with open(engagement_matrix_file, 'rb') as fr:
+#     engagement_matrix = pickle.load(fr)
+#   fr.close()
+  engagement_matrix = None
 
   cluster_assignments = cls.predict(pilot_static_features)
 
