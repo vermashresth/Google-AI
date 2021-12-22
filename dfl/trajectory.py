@@ -56,7 +56,7 @@ def simulateTrajectories(args, env, start_state=None):
                 traj[tr, pol_idx, timestep, dim_dict['state'], :] = np.copy(states)
 
                 ## Get Actions
-                actions=env.getActions(states=states, policy=pol, ts=timestep)
+                actions = env.getActions(states=states, policy=pol, ts=timestep)
                 action_record[tr, pol_idx, timestep, :] = np.copy(actions)
                 traj[tr, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
 
@@ -65,7 +65,8 @@ def simulateTrajectories(args, env, start_state=None):
                 traj[tr, pol_idx, timestep, dim_dict['next_state'], :] = np.copy(next_states)
 
                 # Get rewards
-                rewards = env.getRewards(next_states)
+                # rewards = env.getRewards(next_states)
+                rewards = np.copy(states)
                 traj[tr, pol_idx, timestep, dim_dict['reward'], :] = np.copy(rewards)
                 
                 states = next_states
