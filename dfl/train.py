@@ -23,7 +23,7 @@ if __name__ == '__main__':
     n_trials = 10
     L = 10
     K = 10
-    m = 2
+    m = 3
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'

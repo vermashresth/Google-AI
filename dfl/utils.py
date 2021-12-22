@@ -61,31 +61,33 @@ def generateRandomTMatrix(N, m):
     for i in range(N):
         for j in range(m):
             T[i,0,j,:] = getRandomProbabilityDistribution(m)
-            T[i,1,j,:] = 1 - T[i,0,j,:]
+            T[i,1,j,:] = getRandomProbabilityDistribution(m)
     return T  
 
 
-def takeAction(states, T, actions):
+def takeActions(states, T, actions):
     '''
     This function is to replace the function takeAction in ARMMAN/simulator.py
     This function supports multiple states (more than 2)
 
     Inputs:
-    states: A vector of size N with binary values {0,1} respresenting the states\
+    states: A vector of size N with integer values {0,1,...,m-1} respresenting the states\
           of beneficiaries
     T: Transition matrix of size Nx2xmxm (num_beneficiaries x action x \
           starting_state x ending_state)
-    actions: A vector of size N with binary values {0,1} representing action \
+    actions: A vector of size N with integer values {0,1,...,m-1} representing action \
           chosen for each beneficiary
 
     Outputs:
-    next_states:  A vector of size N with binary values {0,1} respresenting the\
+    next_states:  A vector of size N with integer values {0,1,...,m-1} respresenting the\
           *next* states of beneficiaries, determined using coin tosses
     '''
 
-    next_states=np.random.binomial(1, T[np.arange(T.shape[0]),actions.astype(int)\
-                                      , states,1])
-    return next_states
+    N, m = T.shape[0], T.shape[2] # T: [N, 2, m, m]
+    next_states = np.zeros(N)
+    for i in range(N):
+        next_states[i] = np.random.choice(a=m, size=1, p=T[i,actions[i],states[i],:])
+    return next_states.astype('int64')
 
 
 """

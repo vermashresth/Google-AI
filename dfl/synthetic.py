@@ -31,7 +31,7 @@ def generateDataset(n_benefs, m, n_instances, n_trials, L, K, gamma):
     for i in range(n_instances):
         T_data = generateRandomTMatrix(n_benefs, m=m)
         feature = model(tf.constant(T_data.reshape(-1,2*m*m))).numpy()
-        w = np.zeros((n_benefs, 2)) # Not running Whittle policy so this in not important
+        w = np.zeros((n_benefs, m)) # Not running Whittle policy so this in not important
 
         sim_seed = i  # just a randomness
         mask_seed = i # just a randomness
@@ -49,12 +49,12 @@ def generateDataset(n_benefs, m, n_instances, n_trials, L, K, gamma):
 
 if __name__ == '__main__':
     # Testing data generation
-    n_benefs = 10
+    n_benefs = 50
     n_instances = 20
     n_trials = 10
     L = 10
     K = 3
-    m = 2
+    m = 3
     gamma = 0.99
 
     T_data = generateRandomTMatrix(n_benefs, m=m)

@@ -6,7 +6,8 @@ import tqdm
 from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
 from dfl.policy import getActions
 from dfl.utils import getBenefsByCluster
-from armman.simulator import takeActions
+# from armman.simulator import takeActions
+from dfl.utils import takeActions
 
 from collections import defaultdict
 
