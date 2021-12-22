@@ -47,7 +47,7 @@ def get_offline_traj(n_benefs, T, K, n_trials):
     offline_traj[0, # trial index
                         policy_map['rr'], # policy index
                         :, # time index
-                        dim_dict['new_state'], # tuple dimension
+                        dim_dict['next_state'], # tuple dimension
                         : # benef index
                     ] = np.copy(state_matrix.T[1:, :])
     offline_traj[0, # trial index

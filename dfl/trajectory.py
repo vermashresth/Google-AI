@@ -11,68 +11,77 @@ from armman.simulator import takeActions
 from collections import defaultdict
 
 def simulateTrajectories(args, T=None, w=None, start_state=None):
-  E_START_STATE_PROB=0.5
-  ##### Unpack arguments
-  L=args.simulation_length
-  N=args.num_beneficiaries
-  k=args.num_resources
-  ntr=args.num_trials
-  
-  policies=[0, 1, 2]
+    E_START_STATE_PROB=0.5
+    ##### Unpack arguments
+    L=args.simulation_length
+    N=args.num_beneficiaries
+    k=args.num_resources
+    ntr=args.num_trials
 
-  state_record=np.zeros((ntr, len(policies),L,N))  # Store the full state
-                                                   # trajectory
-  action_record=np.zeros((ntr, len(policies),L,N))  # Store the full state
-                                                   # trajectory
+    policies=[0, 1, 2]
+    n_policies = len(policies)
+    state_record=np.zeros((ntr, n_policies, L, N))  # Store the full state
+                                                    # trajectory
+    action_record=np.zeros((ntr, n_policies, L, N))  # Store the full state
+                                                    # trajectory
 
-  simulated_rewards=np.zeros((ntr, len(policies))) # Store aggregate rewards
-  history_dict = {i_pol: [] for i_pol in policies}
-  
-  traj = []
-  ##### Iterate over number of independent trials to average over
-  for tr in range(ntr):
-    tr_traj = []
-    ## Initialize for each trial
-    np.random.seed(seed=tr+args.seed_base)
-     # Random state \
-    #initialization                      
-    
-    ## For current trial, evaluate all policies
-    for pol_idx, pol in enumerate(policies):
-      pol_traj = []
-      if start_state is None:
-          states=np.random.binomial(1, E_START_STATE_PROB, size=N)
-      else:
-        assert start_state.shape == (N,)
-        states = np.copy(start_state)
-      ## Iterate over timesteps. Note that if simulation length is L, 
-      ## there are L-1 action decisions to take.
-      for timestep in range(L-1):
-        tupl = []
-        ## Compute actions
-        state_record[tr, pol_idx, timestep, :] = np.copy(states)
-        tupl.append(np.copy(states))
+    simulated_rewards=np.zeros((ntr, n_policies)) # Store aggregate rewards
+
+
+    traj = np.zeros((ntr, n_policies, L, len(dim_dict), N))
+    ##### Iterate over number of independent trials to average over
+    for tr in range(ntr):
+
+        ## Initialize for each trial
+        np.random.seed(seed=tr+args.seed_base)
+        # Random state \
+        #initialization                      
         
-        actions=getActions(states=states, policy=pol, ts=timestep, w=w, k=k)
-        action_record[tr, pol_idx, timestep, :] = np.copy(actions)
-        tupl.append(actions)
+        ## For current trial, evaluate all policies
+        for pol_idx, pol in enumerate(policies):
+            pol_traj = []
+            if start_state is None:
+                #TODO: Make sure this supports S states
+                states=np.random.binomial(1, E_START_STATE_PROB, size=N)
+            else:
+                assert start_state.shape == (N,)
+                states = np.copy(start_state)
+            
+            ## Iterate over timesteps. Note that if simulation length is L, 
+            ## there are L-1 action decisions to take.
+            for timestep in range(L-1):
+                # tupl = []
 
-        states = np.copy(takeActions(states, T, actions))
-        tupl.append(states)
-        tupl.append(np.copy(state_record[tr, pol_idx, timestep, :]))
-        pol_traj.append(tupl)
+                ## Note Current State
+                state_record[tr, pol_idx, timestep, :] = np.copy(states)
+                traj[tr, pol_idx, timestep, dim_dict['state'], :] = np.copy(states)
 
-      simulated_rewards[tr, pol_idx]=np.sum(np.sum(state_record[tr,pol_idx], \
-                                                    axis=1))
+                ## Get Actions
+                actions=getActions(states=states, policy=pol, ts=timestep, w=w, k=k)
+                action_record[tr, pol_idx, timestep, :] = np.copy(actions)
+                traj[tr, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
 
-      tr_traj.append(pol_traj)
-    traj.append(tr_traj)
-  ##### Print results
-  for pol in policies: 
-    print("Expected reward of policy %s is %s"%(policy_names[pol], \
-                            np.mean(simulated_rewards[:,policies.index(pol)])))
+
+                next_states = takeActions(states, T, actions)
+                traj[tr, pol_idx, timestep, dim_dict['next_state'], :] = np.copy(next_states)
+
+                # Get rewards
+                # rewards = env.getRewards(next_states)
+                rewards = np.copy(states)
+                traj[tr, pol_idx, timestep, dim_dict['reward'], :] = np.copy(rewards)
+                
+                states = next_states
+
+            simulated_rewards[tr, pol_idx]=np.sum(np.sum(state_record[tr,pol_idx], \
+                                                        axis=1))
+
+        
+        ##### Print results
+        for pol in policies: 
+            print("Expected reward of policy %s is %s"%(policy_names[pol], \
+                                np.mean(simulated_rewards[:,policies.index(pol)])))
   
-  return simulated_rewards, state_record, action_record, np.array(traj)
+    return simulated_rewards, state_record, action_record, traj
 
 
 def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10, T_data=None, w=None, start_state=None, debug=False, replace=False):
@@ -113,7 +122,7 @@ def getBenefsEmpProbs(traj, benef_ids, policy_id, trial_id, min_sup = 1, decompo
         ]
     s_traj_c =  benef_ci_traj[:, :-1, dim_dict['state']]
     a_traj_c =  benef_ci_traj[:, :-1, dim_dict['action']]
-    s_prime_traj_c =  benef_ci_traj[:, :-1, dim_dict['new_state']]
+    s_prime_traj_c =  benef_ci_traj[:, :-1, dim_dict['next_state']]
     a_prime_traj_c = benef_ci_traj[:, 1:, dim_dict['action']]
 
     transitions_df = pd.DataFrame(columns = ['s', 's_prime', 'a', 'a_prime'])
@@ -315,7 +324,7 @@ def augmentTraj(traj, true_traj_dfs, policy_id, trial_id, emp_prob_lookup, looku
                     s_prime, a_prime = list(options.keys())[choice]
                     aug_traj[aug_traj_i, 0, ts, dim_dict['state'], benef] = s
                     aug_traj[aug_traj_i, 0, ts, dim_dict['action'], benef] = a
-                    aug_traj[aug_traj_i, 0, ts, dim_dict['new_state'], benef] = s_prime
+                    aug_traj[aug_traj_i, 0, ts, dim_dict['next_state'], benef] = s_prime
                     aug_traj[aug_traj_i, 0, ts, dim_dict['reward'], benef] = s
                     count_dict[str(tuple([int(s), int(a), int(s_prime), int(a_prime)]))]+=1
                     s, a = s_prime, a_prime
@@ -360,7 +369,7 @@ def augmentTrajDecomposed(traj, policy_id, trial_id, emp_prob_lookup, lookup_by_
 
                 aug_traj[aug_traj_i, 0, ts, dim_dict['state'], benef] = s
                 aug_traj[aug_traj_i, 0, ts, dim_dict['action'], benef] = a
-                aug_traj[aug_traj_i, 0, ts, dim_dict['new_state'], benef] = s_prime
+                aug_traj[aug_traj_i, 0, ts, dim_dict['next_state'], benef] = s_prime
                 aug_traj[aug_traj_i, 0, ts, dim_dict['reward'], benef] = s
                 s, a = s_prime, a_prime
     print('Generated Augmented Traj of shape: ', aug_traj.shape)

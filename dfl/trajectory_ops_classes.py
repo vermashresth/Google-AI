@@ -20,7 +20,7 @@ class TrajectoryOps():
             ]
         s_traj_c =  benef_ci_traj[:, :-1, dim_dict['state']]
         a_traj_c =  benef_ci_traj[:, :-1, dim_dict['action']]
-        s_prime_traj_c =  benef_ci_traj[:, :-1, dim_dict['new_state']]
+        s_prime_traj_c =  benef_ci_traj[:, :-1, dim_dict['next_state']]
         a_prime_traj_c = benef_ci_traj[:, 1:, dim_dict['action']]
 
         transitions_df = pd.DataFrame(columns = ['s', 's_prime', 'a', 'a_prime'])
@@ -119,7 +119,7 @@ class TrajectoryOps():
                     s_prime, a_prime = list(options.keys())[choice]
                     aug_traj[aug_traj_i, 0, ts, dim_dict['state'], benef] = s
                     aug_traj[aug_traj_i, 0, ts, dim_dict['action'], benef] = a
-                    aug_traj[aug_traj_i, 0, ts, dim_dict['new_state'], benef] = s_prime
+                    aug_traj[aug_traj_i, 0, ts, dim_dict['next_state'], benef] = s_prime
                     aug_traj[aug_traj_i, 0, ts, dim_dict['reward'], benef] = s
                     s, a = s_prime, a_prime
         print('Generated Augmented Traj of shape: ', aug_traj.shape)
