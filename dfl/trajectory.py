@@ -6,16 +6,17 @@ import tqdm
 from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
 from dfl.policy import getActions
 from dfl.utils import getBenefsByCluster
+from dfl.environments import armmanEnv
+
 from armman.simulator import takeActions
 
 from collections import defaultdict
 
-def simulateTrajectories(args, T=None, w=None, start_state=None):
-    E_START_STATE_PROB=0.5
+def simulateTrajectories(args, env, start_state=None):
+    
     ##### Unpack arguments
     L=args.simulation_length
     N=args.num_beneficiaries
-    k=args.num_resources
     ntr=args.num_trials
 
     policies=[0, 1, 2]
@@ -32,46 +33,44 @@ def simulateTrajectories(args, T=None, w=None, start_state=None):
     ##### Iterate over number of independent trials to average over
     for tr in range(ntr):
 
-        ## Initialize for each trial
-        np.random.seed(seed=tr+args.seed_base)
-        # Random state \
-        #initialization                      
+        ## Initialize Random State for each trial
+        np.random.seed(seed=tr+args.seed_base)                   
         
         ## For current trial, evaluate all policies
         for pol_idx, pol in enumerate(policies):
-            pol_traj = []
+
+            # Initialize State
             if start_state is None:
-                #TODO: Make sure this supports S states
-                states=np.random.binomial(1, E_START_STATE_PROB, size=N)
+                states=env.getStartState()
             else:
+                # Explicitly given start_state, for debugging purposes
                 assert start_state.shape == (N,)
                 states = np.copy(start_state)
             
             ## Iterate over timesteps. Note that if simulation length is L, 
             ## there are L-1 action decisions to take.
             for timestep in range(L-1):
-                # tupl = []
 
                 ## Note Current State
                 state_record[tr, pol_idx, timestep, :] = np.copy(states)
                 traj[tr, pol_idx, timestep, dim_dict['state'], :] = np.copy(states)
 
                 ## Get Actions
-                actions=getActions(states=states, policy=pol, ts=timestep, w=w, k=k)
+                actions=env.getActions(states=states, policy=pol, ts=timestep)
                 action_record[tr, pol_idx, timestep, :] = np.copy(actions)
                 traj[tr, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
 
-
-                next_states = takeActions(states, T, actions)
+                ## Transition to next state
+                next_states = env.takeActions(states, actions)
                 traj[tr, pol_idx, timestep, dim_dict['next_state'], :] = np.copy(next_states)
 
                 # Get rewards
-                # rewards = env.getRewards(next_states)
-                rewards = np.copy(states)
+                rewards = env.getRewards(next_states)
                 traj[tr, pol_idx, timestep, dim_dict['reward'], :] = np.copy(rewards)
                 
                 states = next_states
 
+            # Note Rewards
             simulated_rewards[tr, pol_idx]=np.sum(np.sum(state_record[tr,pol_idx], \
                                                         axis=1))
 
@@ -94,17 +93,28 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     parser.add_argument('-p', '--policy', default=-1, type=int, help='policy to run. default is all policies')
     parser.add_argument("-f", "--fff", help="a dummy argument to fool ipython", default="1")
     args = parser.parse_args()
+
+    # Set args params
     args.num_beneficiaries=n_benefs
     args.num_resources=K
     args.simulation_length=T
     args.num_trials=n_trials
     args.seed_base = seed
 
+    # If transitions matrix is for larger number of benefs than `n_benefs`, generate a mask
     np.random.seed(mask_seed)
     mask = np.random.choice(np.arange(T_data.shape[0]), n_benefs, replace=replace)
     
+    # Define Simulation environment
     np.random.seed(args.seed_base)
-    simulated_rewards, state_record, action_record, traj = simulateTrajectories(args, T=T_data[mask], w=w[mask], start_state=start_state)
+    env = armmanEnv(N=n_benefs,
+                    T_data=T_data[mask],
+                    w=w[mask],
+                    k = K,
+                    seed = seed)
+    
+    # Run simulation
+    simulated_rewards, state_record, action_record, traj = simulateTrajectories(args, env, start_state=start_state)
 
     if debug:
         print(mask[:10])

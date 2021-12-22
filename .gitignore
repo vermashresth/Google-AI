@@ -1,6 +1,7 @@
 *.csv
 *.pkl
 *.txt
+*.ipynb
 *__pycache__
 *.DS_Store
 mmitra-rmab/feb16-mar15_data
