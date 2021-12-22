@@ -8,6 +8,8 @@ import pandas as pd
 import pickle
 import tqdm
 import tensorflow as tf
+import sys
+sys.path.insert(0, "../")
 
 from itertools import combinations
 
@@ -36,6 +38,55 @@ def aux_dict_to_transition_matrix(aux_dict_ssa, n_benefs):
                 T_data[benef, s, a, s_prime] = prob
     T_data[np.isnan(T_data)] = 1/N_STATES
     return T_data
+
+def getRandomProbabilityDistribution(m):
+    random_points = np.random.uniform(size=m-1)
+    random_points = np.append(random_points, [0,1])
+    sorted_points = sorted(random_points)
+    diffs = np.diff(sorted_points)
+    assert np.sum(diffs) == 1 and len(diffs) == m
+    return diffs
+
+def generateRandomTMatrix(N, m):
+
+    """
+    This function is to replace the function in armman/simulator.py to support multiple states
+
+    Generates a Nx2xmxm T matrix indexed as: \
+    T[beneficiary_number][action][current_state][next_state]
+    action=0 denotes passive action, a=1 is active action
+    """
+        
+    T = np.zeros((N,2,m,m))
+    for i in range(N):
+        for j in range(m):
+            T[i,0,j,:] = getRandomProbabilityDistribution(m)
+            T[i,1,j,:] = 1 - T[i,0,j,:]
+    return T  
+
+
+def takeAction(states, T, actions):
+    '''
+    This function is to replace the function takeAction in ARMMAN/simulator.py
+    This function supports multiple states (more than 2)
+
+    Inputs:
+    states: A vector of size N with binary values {0,1} respresenting the states\
+          of beneficiaries
+    T: Transition matrix of size Nx2xmxm (num_beneficiaries x action x \
+          starting_state x ending_state)
+    actions: A vector of size N with binary values {0,1} representing action \
+          chosen for each beneficiary
+
+    Outputs:
+    next_states:  A vector of size N with binary values {0,1} respresenting the\
+          *next* states of beneficiaries, determined using coin tosses
+    '''
+
+    next_states=np.random.binomial(1, T[np.arange(T.shape[0]),actions.astype(int)\
+                                      , states,1])
+    return next_states
+
 
 """
 DIFFERENTIALBLE TOP-K LAYER

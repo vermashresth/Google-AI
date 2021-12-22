@@ -1,5 +1,8 @@
 import tensorflow as tf
 import numpy as np
+import sys
+sys.path.insert(0, "../")
+
 from armman.simulator import getTopk
 from dfl.config import dim_dict, policy_map
 from dfl.utils import getSoftTopk, DiffTopK, nck
