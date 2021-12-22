@@ -1,5 +1,8 @@
 import tensorflow as tf
 import numpy as np
+import sys
+sys.path.insert(0, "../")
+
 from armman.simulator import getTopk
 from dfl.config import dim_dict, policy_map
 from dfl.utils import getSoftTopk, DiffTopK, nck
@@ -23,7 +26,7 @@ def getActions(states, policy, ts, w, k):
         whittle_indices=w[np.arange(N), states]
 
         top_k_whittle=getTopk(whittle_indices, k)
-        actions[top_k_whittle]=1
+        actions[top_k_whittle] = 1
     elif policy == 3:
         # select k arms by Whittle using soft top k
         N = len(states)
@@ -31,9 +34,9 @@ def getActions(states, policy, ts, w, k):
         whittle_indices=w[np.arange(N), states]
 
         soft_top_k_whittle=getSoftTopk([whittle_indices], k)
-        actions[soft_top_k_whittle]=1
+        actions[soft_top_k_whittle] = 1
 
-    return actions
+    return actions.astype('int64')
 
 
 def getActionProbDefault(states, action, policy):

@@ -15,9 +15,9 @@ from collections import defaultdict
 def simulateTrajectories(args, env, start_state=None):
 
     ##### Unpack arguments
-    L=args.simulation_length
-    N=args.num_beneficiaries
-    ntr=args.num_trials
+    L=args['simulation_length']
+    N=args['num_beneficiaries']
+    ntr=args['num_trials']
 
     policies=[0, 1, 2]
     n_policies = len(policies)
@@ -34,7 +34,7 @@ def simulateTrajectories(args, env, start_state=None):
     for tr in range(ntr):
 
         ## Initialize Random State for each trial
-        np.random.seed(seed=tr+args.seed_base)                   
+        np.random.seed(seed=tr+args['seed_base'])
         
         ## For current trial, evaluate all policies
         for pol_idx, pol in enumerate(policies):
@@ -86,30 +86,22 @@ def simulateTrajectories(args, env, start_state=None):
 
 def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
                              env = 'armman', T_data=None, w=None, start_state=None, debug=False, replace=False):
-    parser = argparse.ArgumentParser(description='Inputs to engagement simulator module')
-    parser.add_argument('-N', '--num_beneficiaries', default=7000, type=int, help='Number of Beneficiaries')
-    parser.add_argument('-k', '--num_resources', default=1400, type=int, help='Number of calls available per day')
-    parser.add_argument('-L', '--simulation_length', default=40, type=int, help='Number of timesteps of simulation')
-    parser.add_argument('-ntr', '--num_trials', default=10, type=int, help='Number of independent trials')
-    parser.add_argument('-s', '--seed_base', default=10, type=int, help='Seedbase for numpy. This is starting seedbase. Simulation will consider the seeds= {seed_base, ... seed_base+ntr-1}')
-    parser.add_argument('-p', '--policy', default=-1, type=int, help='policy to run. default is all policies')
-    parser.add_argument('-env', '--env', default='armman', type=str, help='environment to simulate on')
-    parser.add_argument("-f", "--fff", help="a dummy argument to fool ipython", default="1")
-    args = parser.parse_args()
 
     # Set args params
-    args.num_beneficiaries=n_benefs
-    args.num_resources=K
-    args.simulation_length=T
-    args.num_trials=n_trials
-    args.seed_base = seed
-    args.env = env
+    args = {}
+    args['num_beneficiaries']=n_benefs
+    args['num_resources']=K
+    args['simulation_length']=T
+    args['num_trials']=n_trials
+    args['seed_base'] = seed
+    args['env'] = env
+
     # If transitions matrix is for larger number of benefs than `n_benefs`, generate a mask
     np.random.seed(mask_seed)
     mask = np.random.choice(np.arange(T_data.shape[0]), n_benefs, replace=replace)
     
     # Define Simulation environment
-    np.random.seed(args.seed_base)
+    np.random.seed(seed)
     if env=='armman':
         envClass = armmanEnv
     elif env=='dummy_3':
@@ -123,6 +115,10 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
                     k = K,
                     seed = seed)
     
+    ## TODO: Discrepancy in T_data ordering between real and synthetic
+    # assert(T_data.shape[2] == 2) # 2 actions
+    # assert(T_data.shape[1] == T_data.shape[3] == env.n_states) # n_states
+
     # Run simulation
     simulated_rewards, state_record, action_record, traj = simulateTrajectories(args, env, start_state=start_state)
 

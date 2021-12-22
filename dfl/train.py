@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 import tqdm
 import sys
-sys.path.insert(0, "/mnt/chromeos/GoogleDrive/SharedWithMe/436/Decision Focused Learning/")
+sys.path.insert(0, "../")
 
 from dfl.model import ANN
 from dfl.synthetic import generateDataset
@@ -23,12 +23,13 @@ if __name__ == '__main__':
     n_trials = 10
     L = 10
     K = 10
+    m = 3
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
 
     # dataset generation
-    full_dataset  = generateDataset(n_benefs, n_instances, n_trials, L, K, gamma)
+    full_dataset  = generateDataset(n_benefs, m, n_instances, n_trials, L, K, gamma)
     train_dataset = full_dataset[:int(n_instances*0.7)]
     val_dataset   = full_dataset[int(n_instances*0.7):int(n_instances*0.8)]
     test_dataset  = full_dataset[int(n_instances*0.8):]
@@ -36,7 +37,7 @@ if __name__ == '__main__':
     dataset_list = [('train', train_dataset), ('val', val_dataset), ('test', test_dataset)]
 
     # model initialization
-    model = ANN()
+    model = ANN(m=m)
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
     loss_fn = tf.keras.losses.mean_squared_error
 
