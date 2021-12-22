@@ -6,6 +6,7 @@ from dfl.utils import getSoftTopk, DiffTopK, nck
 
 WHITTLE_EPS = 1e-2
 
+# Review: for now, getActions is in both environment.py and here
 def getActions(states, policy, ts, w, k):
     N = len(states)
     actions=np.zeros(N)

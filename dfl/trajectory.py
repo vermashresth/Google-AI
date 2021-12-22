@@ -6,14 +6,14 @@ import tqdm
 from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
 from dfl.policy import getActions
 from dfl.utils import getBenefsByCluster
-from dfl.environments import armmanEnv
+from dfl.environments import armmanEnv, dummy3StatesEnv
 
 from armman.simulator import takeActions
 
 from collections import defaultdict
 
 def simulateTrajectories(args, env, start_state=None):
-    
+
     ##### Unpack arguments
     L=args.simulation_length
     N=args.num_beneficiaries
@@ -83,7 +83,8 @@ def simulateTrajectories(args, env, start_state=None):
     return simulated_rewards, state_record, action_record, traj
 
 
-def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10, T_data=None, w=None, start_state=None, debug=False, replace=False):
+def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
+                             env = 'armman', T_data=None, w=None, start_state=None, debug=False, replace=False):
     parser = argparse.ArgumentParser(description='Inputs to engagement simulator module')
     parser.add_argument('-N', '--num_beneficiaries', default=7000, type=int, help='Number of Beneficiaries')
     parser.add_argument('-k', '--num_resources', default=1400, type=int, help='Number of calls available per day')
@@ -91,6 +92,7 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     parser.add_argument('-ntr', '--num_trials', default=10, type=int, help='Number of independent trials')
     parser.add_argument('-s', '--seed_base', default=10, type=int, help='Seedbase for numpy. This is starting seedbase. Simulation will consider the seeds= {seed_base, ... seed_base+ntr-1}')
     parser.add_argument('-p', '--policy', default=-1, type=int, help='policy to run. default is all policies')
+    parser.add_argument('-env', '--env', default='armman', type=str, help='environment to simulate on')
     parser.add_argument("-f", "--fff", help="a dummy argument to fool ipython", default="1")
     args = parser.parse_args()
 
@@ -100,14 +102,21 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     args.simulation_length=T
     args.num_trials=n_trials
     args.seed_base = seed
-
+    args.env = env
     # If transitions matrix is for larger number of benefs than `n_benefs`, generate a mask
     np.random.seed(mask_seed)
     mask = np.random.choice(np.arange(T_data.shape[0]), n_benefs, replace=replace)
     
     # Define Simulation environment
     np.random.seed(args.seed_base)
-    env = armmanEnv(N=n_benefs,
+    if env=='armman':
+        envClass = armmanEnv
+    elif env=='dummy_3':
+        envClass = dummy3StatesEnv
+    else:
+        print(f'{env} not supported!!')
+        raise
+    env = envClass(N=n_benefs,
                     T_data=T_data[mask],
                     w=w[mask],
                     k = K,
