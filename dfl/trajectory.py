@@ -8,7 +8,7 @@ from dfl.policy import getActions
 from dfl.utils import getBenefsByCluster
 from dfl.environments import armmanEnv, dummy3StatesEnv
 
-from armman.simulator import takeActions
+# from armman.simulator import takeActions
 
 from collections import defaultdict
 
@@ -101,7 +101,7 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     mask = np.random.choice(np.arange(T_data.shape[0]), n_benefs, replace=replace)
     
     # Define Simulation environment
-    np.random.seed(seed)
+    np.random.seed(int(seed))
     if env=='armman':
         envClass = armmanEnv
     elif env=='dummy_3':

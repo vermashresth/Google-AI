@@ -8,8 +8,9 @@ from dfl.trajectory import getSimulatedTrajectories
 from utils import generateRandomTMatrix
 
 
-def generateDataset(n_benefs, m, n_instances, n_trials, L, K, gamma):
+def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma):
     # n_benefs: number of beneficiaries in a cohort
+    # n_states: number of states
     # n_instances: number of cohorts in the whole dataset
     # n_trials: number of trajectories we obtained from each cohort. In the real-world dataset, n_trials=1
     # L: number of time steps
@@ -29,16 +30,16 @@ def generateDataset(n_benefs, m, n_instances, n_trials, L, K, gamma):
 
     # Generating synthetic data
     for i in range(n_instances):
-        T_data = generateRandomTMatrix(n_benefs, m=m)
-        feature = model(tf.constant(T_data.reshape(-1,2*m*m))).numpy()
-        w = np.zeros((n_benefs, m)) # Not running Whittle policy so this in not important
+        T_data = generateRandomTMatrix(n_benefs, n_states=n_states)
+        feature = model(tf.constant(T_data.reshape(-1,2*n_states*n_states))).numpy()
+        w = np.zeros((n_benefs, n_states)) # Not running Whittle policy so this in not important
 
         sim_seed = i  # just a randomness
         mask_seed = i # just a randomness
         traj, sim_whittle, simulated_rewards, mask, \
                 state_record, action_record = getSimulatedTrajectories(
-                                                n_benefs, m, L, K, n_trials, gamma,
-                                                sim_seed, mask_seed, T_data, w, replace=False
+                                                n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
+                                                seed=sim_seed, mask_seed=mask_seed, T_data=T_data, w=w, replace=False
                                                 )
 
         instance = (feature, T_data, traj, simulated_rewards, mask, state_record, action_record)
@@ -54,8 +55,8 @@ if __name__ == '__main__':
     n_trials = 10
     L = 10
     K = 3
-    m = 3
+    n_states = 2
     gamma = 0.99
 
-    T_data = generateRandomTMatrix(n_benefs, m=m)
-    dataset = generateDataset(n_benefs, m, n_instances, n_trials, L, K, gamma=gamma)
+    T_data = generateRandomTMatrix(n_benefs, n_states=n_states)
+    dataset = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma=gamma)

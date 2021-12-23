@@ -11,6 +11,69 @@ from itertools import combinations
 """
 DIFFERENTIALBLE WHITTLE INDEX LAYER
 """
+
+def newWhittleIndex(P, R, gamma=0.99):
+    '''
+    Inputs:
+        P: Transition matrix of dimensions N X n_states X 2 X n_states where axes are:
+          batchsize(N), start_state, action, end_state
+
+        R: Rewards of the corresponding states (0,1,...,n_states-1)
+           R is a matrix of size N X n_states
+           The rewards of each batch is not neccesary identical.
+
+        gamma: Discount factor
+
+        Tensorflow should keep track of the gradient of matrix P and R.
+
+    Returns:
+        index: N x n_states Tensor of Whittle index for states (0,1,...,n_states-1)
+    '''
+
+    # Part 1: disable gradient tracking and use value iteration and binary search to find Whittle index
+    #         This part should support parallelization
+    #         This part should always disable tracking gradient of P and R by using "tf.stop_gradient(P)"
+
+    N, n_states = P.shape[0], P.shape[1]
+    tmp_P, tmp_R = tf.stop_gradient(P), tf.stop_gradient(R)
+
+    # initialize upper and lower bounds
+    w_ub = np.ones(N)  # Whittle index upper bound
+    w_lb = np.zeros(N) # Whittle index lower bound
+
+    n_binary_search_iterations = 100 # Using a fixed # of iterations or a tolerance rate instead
+    for _ in range(n_binary_search_iteartions):
+        w = (w_ub + w_lb) / 2
+        # initialize value functions
+        V = np.zeros(N, n_states) # value function
+        for _ in range(iterations):
+            # value iteration to update V
+            pass
+        
+        # Compute an indicator vector to mark if Whittle index is too large or too small
+        # comparison = (value of not call > value of call) # a vector of size N to indicate if w is too large or not
+        # w_ub = w_ub - (w_ub - w_lb) / 2 * comparison
+        # w_lb = w_lb + (w_ub - w_lb) / 2 * (1 - comparison)
+
+    # outcome: w = (w_ub + w_lb) / 2
+
+    # Part 2: figure out which set of argmax in the Bellman equation holds.
+    #         V[state] = argmax 0 + w + sum_{next_state} P_passive[state, next_state] V[next_state]
+    #                           R[state] + sum_{next_state} P_active[state, next_state] V[next_state]
+    # In total, there are n_states-1 argmax, each with 2 actions. 
+    # You can maintain a vector of size (N, n_states, ) to mark which one in the argmax holds.
+    # This vector will later be used to formulate the corresponding linear equation that Whittle should satisfy.
+
+
+    # Part 3: reformulating Whittle index computation as a solution to a linear equation.
+    #         Since now we know which argmax holds in Bellman equation, we can express Whittle index as a solution to a linear equation.
+    #         We will keep tracking gradient in this part and recompute the Whittle index again to allow Tensorflow to backpropagate.
+
+    # Express w, V as a solutions to linear equations.
+    # w = tf.linalg.solve(compute_the_chosen_matrix(P, R, gamma, indicator_function), rhs)
+
+    return w
+
 def whittleIndex(P, gamma=0.99):
     '''
     Inputs:

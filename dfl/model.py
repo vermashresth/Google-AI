@@ -30,14 +30,14 @@ class ANN(Model):
         super(ANN, self).__init__()
         self.m = m
         self.d1 = Dense(64, activation='relu', trainable=True, input_shape=(16,))
-        self.d2 = Dense(2*m*m, activation='relu', trainable=True)
+        self.d2 = Dense(m*2*m, activation='relu', trainable=True)
         self.softmax = Softmax()
 
     def call(self, x):
         x1 = self.d1(x)
         x2 = self.d2(x1)
 
-        output_raw = tf.reshape(x2, (-1, 2, self.m, self.m))
+        output_raw = tf.reshape(x2, (-1, self.m, 2, self.m))
         output = self.softmax(output_raw)
 
         return output

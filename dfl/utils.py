@@ -47,7 +47,7 @@ def getRandomProbabilityDistribution(m):
     assert np.sum(diffs) == 1 and len(diffs) == m
     return diffs
 
-def generateRandomTMatrix(N, m):
+def generateRandomTMatrix(N, n_states):
 
     """
     This function is to replace the function in armman/simulator.py to support multiple states
@@ -57,11 +57,11 @@ def generateRandomTMatrix(N, m):
     action=0 denotes passive action, a=1 is active action
     """
         
-    T = np.zeros((N,2,m,m))
+    T = np.zeros((N,2,n_states,n_states))
     for i in range(N):
-        for j in range(m):
-            T[i,0,j,:] = getRandomProbabilityDistribution(m)
-            T[i,1,j,:] = getRandomProbabilityDistribution(m)
+        for j in range(n_states):
+            T[i,j,0,:] = getRandomProbabilityDistribution(n_states)
+            T[i,j,1,:] = getRandomProbabilityDistribution(n_states)
     return T  
 
 
@@ -73,8 +73,8 @@ def takeActions(states, T, actions):
     Inputs:
     states: A vector of size N with integer values {0,1,...,m-1} respresenting the states\
           of beneficiaries
-    T: Transition matrix of size Nx2xmxm (num_beneficiaries x action x \
-          starting_state x ending_state)
+    T: Transition matrix of size Nx2xmxm (num_beneficiaries x starting_state x \
+          action x ending_state)
     actions: A vector of size N with integer values {0,1,...,m-1} representing action \
           chosen for each beneficiary
 
@@ -83,10 +83,10 @@ def takeActions(states, T, actions):
           *next* states of beneficiaries, determined using coin tosses
     '''
 
-    N, m = T.shape[0], T.shape[2] # T: [N, 2, m, m]
+    N, m = T.shape[0], T.shape[2] # T: [N, m, 2, m]
     next_states = np.zeros(N)
     for i in range(N):
-        next_states[i] = np.random.choice(a=m, size=1, p=T[i,actions[i],states[i],:])
+        next_states[i] = np.random.choice(a=m, size=1, p=T[i,states[i],actions[i],:])
     return next_states.astype('int64')
 
 
