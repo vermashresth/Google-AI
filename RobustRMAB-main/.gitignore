@@ -1,7 +1,7 @@
 *.*~
 __pycache__/
 *.pkl
-#*.pickle
+*.pickle
 data/
 **/*.egg-info
 .python-version
