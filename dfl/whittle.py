@@ -78,7 +78,8 @@ def whittleIndex(P, gamma=0.99):
     '''
     Inputs:
         P: Transition matrix of dimensions N X 2 X 2 X 2 where axes are:
-          batchsize(N), action, start_state, end_state
+          [Old]     batchsize(N), action, start_state, end_state
+          [Updated] batchsize(N), start_state, action, end_state
 
         gamma: Discount factor
 
@@ -90,8 +91,8 @@ def whittleIndex(P, gamma=0.99):
 
     ### Matrix equations for state 0
     row1_s0=tf.concat([tf.ones([N,1]), tf.reshape(gamma*P[:, 0,0,0], shape=[N,1]) -tf.ones([N,1]),  tf.reshape(gamma*P[:, 0,0,1], shape=[N,1])], 1)
-    row2_s0=tf.concat([tf.zeros([N,1]), tf.reshape(gamma*P[:, 1,0,0], shape=[N,1]) -tf.ones([N,1]),  tf.reshape(gamma*P[:, 1,0,1], shape=[N,1])], 1)
-    row3a_s0=tf.concat([tf.ones([N,1]), tf.reshape(gamma*P[:, 0,1,0], shape=[N,1]) ,  tf.reshape(gamma*P[:, 0,1,1], shape=[N,1])-tf.ones([N,1])], 1)
+    row2_s0=tf.concat([tf.zeros([N,1]), tf.reshape(gamma*P[:, 0,1,0], shape=[N,1]) -tf.ones([N,1]),  tf.reshape(gamma*P[:, 0,1,1], shape=[N,1])], 1)
+    row3a_s0=tf.concat([tf.ones([N,1]), tf.reshape(gamma*P[:, 1,0,0], shape=[N,1]) ,  tf.reshape(gamma*P[:, 1,0,1], shape=[N,1])-tf.ones([N,1])], 1)
     row3b_s0=tf.concat([tf.zeros([N,1]), tf.reshape(gamma*P[:, 1,1,0], shape=[N,1]) ,  tf.reshape(gamma*P[:, 1,1,1], shape=[N,1])-tf.ones([N,1])], 1)
 
     A1_s0= tf.concat([tf.reshape(row1_s0, shape=[N,1,3]),
@@ -99,24 +100,24 @@ def whittleIndex(P, gamma=0.99):
                   tf.reshape(row3a_s0, shape=[N, 1,3])],1)
 
     A2_s0= tf.concat([tf.reshape(row1_s0, shape=[N,1,3]),
-                  tf.reshape(row2_s0, shape=[N, 1,3]),
-                  tf.reshape(row3b_s0, shape=[N, 1,3])],1)
+                  tf.reshape(row2_s0, shape=[N,1,3]),
+                  tf.reshape(row3b_s0, shape=[N,1,3])],1)
     b_s0=tf.constant(np.array([0,0,-1]).reshape(3,1), dtype=tf.float32)
 
 
     ### Matrix equations for state 1
-    row1_s1=tf.concat([tf.ones([N,1]), tf.reshape(gamma*P[:, 0,1,0], shape=[N,1]) ,  tf.reshape(gamma*P[:, 0,1,1], shape=[N,1])-tf.ones([N,1])], 1)
+    row1_s1=tf.concat([tf.ones([N,1]), tf.reshape(gamma*P[:, 1,0,0], shape=[N,1]) ,  tf.reshape(gamma*P[:, 1,0,1], shape=[N,1])-tf.ones([N,1])], 1)
     row2_s1=tf.concat([tf.zeros([N,1]), tf.reshape(gamma*P[:, 1,1,0], shape=[N,1]) ,  tf.reshape(gamma*P[:, 1,1,1], shape=[N,1])-tf.ones([N,1])], 1)
     row3a_s1=tf.concat([tf.ones([N,1]), tf.reshape(gamma*P[:, 0,0,0], shape=[N,1]) -tf.ones([N,1]) ,  tf.reshape(gamma*P[:, 0,0,1], shape=[N,1])], 1)
-    row3b_s1=tf.concat([tf.zeros([N,1]), tf.reshape(gamma*P[:, 1,0,0], shape=[N,1]) -tf.ones([N,1]) ,  tf.reshape(gamma*P[:, 1,0,1], shape=[N,1])], 1)
+    row3b_s1=tf.concat([tf.zeros([N,1]), tf.reshape(gamma*P[:, 0,1,0], shape=[N,1]) -tf.ones([N,1]) ,  tf.reshape(gamma*P[:, 0,1,1], shape=[N,1])], 1)
 
     A1_s1= tf.concat([tf.reshape(row1_s1, shape=[N,1,3]),
-                  tf.reshape(row2_s1, shape=[N, 1,3]),
-                  tf.reshape(row3a_s1, shape=[N, 1,3])],1)
+                  tf.reshape(row2_s1, shape=[N,1,3]),
+                  tf.reshape(row3a_s1, shape=[N,1,3])],1)
 
     A2_s1= tf.concat([tf.reshape(row1_s1, shape=[N,1,3]),
-                  tf.reshape(row2_s1, shape=[N, 1,3]),
-                  tf.reshape(row3b_s1, shape=[N, 1,3])],1)
+                  tf.reshape(row2_s1, shape=[N,1,3]),
+                  tf.reshape(row3b_s1, shape=[N,1,3])],1)
 
     b_s1=tf.constant(np.array([-1, -1, 0]).reshape(3,1), dtype=tf.float32)
 
@@ -137,7 +138,7 @@ def whittleIndex(P, gamma=0.99):
 
     ## Following line implements condition checking when candidate1 is correct
     ## It results in an array of size N, with value 1 if candidate1 is correct else 0.
-    cand1_s0_mask= tf.constant(1.0*(c1s0[:, 0] + 1.0 + gamma*(Pnp[:,0,1,0]*c1s0[:,1] + Pnp[:,0,1,1]*c1s0[:,2]) >= 1.0+ gamma* (Pnp[:,1,1,0]*c1s0[:,1] + Pnp[:,1,1,1]*c1s0[:,2])), dtype=tf.float32)
+    cand1_s0_mask= tf.constant(1.0*(c1s0[:, 0] + 1.0 + gamma*(Pnp[:,1,0,0]*c1s0[:,1] + Pnp[:,1,0,1]*c1s0[:,2]) >= 1.0+ gamma* (Pnp[:,1,1,0]*c1s0[:,1] + Pnp[:,1,1,1]*c1s0[:,2])), dtype=tf.float32)
     cand1_s1_mask= tf.constant(1.0*(c1s1[:, 0] + gamma*(Pnp[:,0,0,0]*c1s0[:,1] + Pnp[:,0,0,1]*c1s0[:,2]) >=  gamma* (Pnp[:,1,0,0]*c1s0[:,1] + Pnp[:,1,0,1]*c1s0[:,2])), dtype=tf.float32)
 
     cand2_s0_mask= (1.0- cand1_s0_mask)

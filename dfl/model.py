@@ -18,7 +18,7 @@ class SyntheticANN(Model):
 
 
 class ANN(Model):
-    def __init__(self, m):
+    def __init__(self, n_states):
         '''
         init
             m: state size
@@ -28,16 +28,16 @@ class ANN(Model):
             transition prob of size 2*m
         '''
         super(ANN, self).__init__()
-        self.m = m
+        self.n_states = n_states
         self.d1 = Dense(64, activation='relu', trainable=True, input_shape=(16,))
-        self.d2 = Dense(m*2*m, activation='relu', trainable=True)
+        self.d2 = Dense(n_states*2*n_states, activation='relu', trainable=True)
         self.softmax = Softmax()
 
     def call(self, x):
         x1 = self.d1(x)
         x2 = self.d2(x1)
 
-        output_raw = tf.reshape(x2, (-1, self.m, 2, self.m))
+        output_raw = tf.reshape(x2, (-1, self.n_states, 2, self.n_states))
         output = self.softmax(output_raw)
 
         return output

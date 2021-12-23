@@ -47,18 +47,18 @@ def getRandomProbabilityDistribution(m):
     assert np.sum(diffs) == 1 and len(diffs) == m
     return diffs
 
-def generateRandomTMatrix(N, n_states):
+def generateRandomTMatrix(n_benefs, n_states):
 
     """
     This function is to replace the function in armman/simulator.py to support multiple states
 
-    Generates a Nx2xmxm T matrix indexed as: \
+    Generates a n_benefs x n_states x 2 x n_states T matrix indexed as: \
     T[beneficiary_number][current_state][action][next_state]
     action=0 denotes passive action, a=1 is active action
     """
         
-    T = np.zeros((N,n_states,2,n_states))
-    for i in range(N):
+    T = np.zeros((n_benefs, n_states, 2, n_states))
+    for i in range(n_benefs):
         for j in range(n_states):
             T[i,j,0,:] = getRandomProbabilityDistribution(n_states)
             T[i,j,1,:] = getRandomProbabilityDistribution(n_states)

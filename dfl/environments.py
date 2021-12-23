@@ -3,10 +3,8 @@ from dfl.utils import getSoftTopk
 from armman.simulator import getTopk
 
 class baseEnv:
-    def __init__(self, N, k, w, T_data, n_states, n_actions, seed):
+    def __init__(self, N, T_data, n_states, n_actions, seed):
         self.N = N
-        self.k = k
-        self.w = w
         self.T_data = T_data
         self.n_states = n_states
         self.n_actions = n_actions
@@ -14,9 +12,7 @@ class baseEnv:
         self.check_shapes()
 
     def check_shapes(self):
-        # Check if shapes of whittle indices and 
-        # transition probability params are correct
-        assert self.w.shape==(len(self.w), self.n_states), 'Whittle Indices not of right shape'
+        # Check if shape of transition probability params is correct
         assert self.T_data.shape==(len(self.T_data), self.n_states, self.n_actions, self.n_states), 'Transition Probabilities not of right shape'
 
     def takeActions(self, states, actions):
@@ -34,12 +30,12 @@ class baseEnv:
         return np.random.multinomial(1, [1/self.n_states]*self.n_states, self.N).argmax(axis=1)
 
 class armmanEnv(baseEnv):
-    def __init__(self, N, k, w, T_data, seed):
+    def __init__(self, N, T_data, seed):
         
         # Review: Remember, in OPE sticthed, we use n_states from global config
         n_states = 2
         n_actions = 2
-        super().__init__(N, k, w, T_data, n_states, n_actions, seed)
+        super().__init__(N, T_data, n_states, n_actions, seed)
     
     def getRewards(self, states):
         # Env specific reward function
@@ -47,24 +43,24 @@ class armmanEnv(baseEnv):
 
 
 class dummy3StatesEnv(baseEnv):
-    def __init__(self, N, k, w, T_data, seed):
+    def __init__(self, N, T_data, seed):
         
         n_states = 3
         n_actions = 2
-        super().__init__(N, k, w, T_data, n_states, n_actions, seed)
+        super().__init__(N, T_data, n_states, n_actions, seed)
     
     def getRewards(self, states):
         # Env specific reward function
         return np.copy(states)
 
 class generalEnv(baseEnv):
-    def __init__(self, N, k, w, T_data, seed):
+    def __init__(self, N, T_data, seed):
         
         # Figure out n_states and n_actions from T_data
         n_states = T_data.shape[1]
         n_actions = T_data.shape[2]
 
-        super().__init__(N, k, w, T_data, n_states, n_actions, seed)
+        super().__init__(N, T_data, n_states, n_actions, seed)
     
     def getRewards(self, states):
         # Env specific reward function

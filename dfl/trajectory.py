@@ -12,7 +12,7 @@ from dfl.environments import armmanEnv, dummy3StatesEnv
 
 from collections import defaultdict
 
-def simulateTrajectories(args, env, start_state=None):
+def simulateTrajectories(args, env, k, w, start_state=None):
 
     ##### Unpack arguments
     L=args['simulation_length']
@@ -56,7 +56,7 @@ def simulateTrajectories(args, env, start_state=None):
                 traj[tr, pol_idx, timestep, dim_dict['state'], :] = np.copy(states)
 
                 ## Get Actions
-                actions = env.getActions(states=states, policy=pol, ts=timestep)
+                actions = getActions(states=states, policy=pol, ts=timestep, w=w, k=k)
                 action_record[tr, pol_idx, timestep, :] = np.copy(actions)
                 traj[tr, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
 
@@ -77,9 +77,9 @@ def simulateTrajectories(args, env, start_state=None):
 
         
         ##### Print results
-        for pol in policies: 
-            print("Expected reward of policy %s is %s"%(policy_names[pol], \
-                                np.mean(simulated_rewards[:,policies.index(pol)])))
+        # for pol in policies: 
+        #     print("Expected reward of policy %s is %s"%(policy_names[pol], \
+        #                         np.mean(simulated_rewards[:,policies.index(pol)])))
   
     return simulated_rewards, state_record, action_record, traj
 
@@ -111,16 +111,13 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
         raise
     env = envClass(N=n_benefs,
                     T_data=T_data[mask],
-                    w=w[mask],
-                    k = K,
                     seed = seed)
     
-    ## TODO: Discrepancy in T_data ordering between real and synthetic
-    # assert(T_data.shape[2] == 2) # 2 actions
-    # assert(T_data.shape[1] == T_data.shape[3] == env.n_states) # n_states
+    assert(T_data.shape[2] == 2) # 2 actions
+    assert(T_data.shape[1] == T_data.shape[3] == env.n_states) # n_states
 
     # Run simulation
-    simulated_rewards, state_record, action_record, traj = simulateTrajectories(args, env, start_state=start_state)
+    simulated_rewards, state_record, action_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], start_state=start_state)
 
     if debug:
         print(mask[:10])
