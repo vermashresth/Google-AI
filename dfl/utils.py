@@ -53,11 +53,11 @@ def generateRandomTMatrix(N, n_states):
     This function is to replace the function in armman/simulator.py to support multiple states
 
     Generates a Nx2xmxm T matrix indexed as: \
-    T[beneficiary_number][action][current_state][next_state]
+    T[beneficiary_number][current_state][action][next_state]
     action=0 denotes passive action, a=1 is active action
     """
         
-    T = np.zeros((N,2,n_states,n_states))
+    T = np.zeros((N,n_states,2,n_states))
     for i in range(N):
         for j in range(n_states):
             T[i,j,0,:] = getRandomProbabilityDistribution(n_states)

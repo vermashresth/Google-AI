@@ -55,7 +55,7 @@ if __name__ == '__main__':
     n_trials = 10
     L = 10
     K = 3
-    n_states = 2
+    n_states = 3
     gamma = 0.99
 
     T_data = generateRandomTMatrix(n_benefs, n_states=n_states)
