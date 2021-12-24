@@ -1,6 +1,5 @@
 import argparse
 import matplotlib.pyplot as plt
-from armman.simulator import get_reward
 import numpy as np
 import pandas as pd
 import pickle
@@ -14,8 +13,8 @@ DIFFERENTIALBLE WHITTLE INDEX LAYER
 """
 def get_reward(R, state, action, m):
     rewards = np.copy(R[:, state])
-    if not action:
-        rewards += m
+    if not action: # Passive action
+        rewards += m # Add subsidy
     return rewards
     
 def newWhittleIndex(P, R, gamma=0.99):
@@ -40,7 +39,6 @@ def newWhittleIndex(P, R, gamma=0.99):
     #         This part should support parallelization
     #         This part should always disable tracking gradient of P and R by using "tf.stop_gradient(P)"
     n_actions = 2
-    gamma = 0.99
     N, n_states = P.shape[0], P.shape[1]
     tmp_P, tmp_R = tf.stop_gradient(P), tf.stop_gradient(R)
 
@@ -78,6 +76,7 @@ def newWhittleIndex(P, R, gamma=0.99):
         # comparison = (value of not call > value of call) # a vector of size N to indicate if w is too large or not
         comparison = (Q[:, :, 0] > Q[:, :, 1]).astype(int)
         
+        # TODO: Might want to update whittle indices for only those (arms, states) having abs(q_diff) more than a Q_delta  
         # Update lower and upper bounds of whittle index binary search
         w_ub = w_ub - (w_ub - w_lb) / 2 * comparison
         w_lb = w_lb + (w_ub - w_lb) / 2 * (1 - comparison)
