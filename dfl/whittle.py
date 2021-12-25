@@ -92,7 +92,25 @@ def newWhittleIndex(P, R, gamma=0.99):
     # In total, there are n_states-1 argmax, each with 2 actions. 
     # You can maintain a vector of size (N, n_states, ) to mark which one in the argmax holds.
     # This vector will later be used to formulate the corresponding linear equation that Whittle should satisfy.
-
+    
+    # Loop over each state
+    for state in range(n_states):
+        # Define indicator matrix `A`
+        indicator_mat = np.zeros((n_states+1, 2*n_states))
+        # Loop over all states and their corresponding argmax actions
+        for s_prime, a_argmax in enumerate(action_max_Q):
+            if a_argmax == 0: # first equation
+                indicator_mat[s_prime, 2*s_prime-1] = 1
+            else:
+                indicator_mat[s_prime, 2*s_prime] = 1
+        # For m+1 th entry, take inverse of entry for s = `state`
+        last_a_argmax = int(not action_max_Q[state]) # Note action not selected earlier for s = state
+        if last_a_argmax == 0:
+            # Set indicator matrix's last entry
+            indicator_mat[-1, 2*state-1] = 1 # First equation
+        else:
+            indicator_mat[-1, 2*state] = 1
+    
 
     # Part 3: reformulating Whittle index computation as a solution to a linear equation.
     #         Since now we know which argmax holds in Bellman equation, we can express Whittle index as a solution to a linear equation.
