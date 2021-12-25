@@ -110,7 +110,20 @@ def newWhittleIndex(P, R, gamma=0.99):
             indicator_mat[-1, 2*state-1] = 1 # First equation
         else:
             indicator_mat[-1, 2*state] = 1
-    
+
+        ## Build the rhs matrix for solving linear equations
+        rhs_zeros = tf.zeros((N, n_states))
+        # Get concatenated matrix with values [-r(0), -r(1), ..., 0, 0 ]
+        rhs_rew_and_zeros = tf.concat([-1*R, rhs_zeros], axis=1)
+        # Rreorder upper matrix to get [-r(0), 0, -r(1), 0]
+        reorder_indices = [j if j%2==0 else n_states+j for j in range(n_states)]
+        rhs_rew_mat = tf.gather(rhs_rew_and_zeros, reorder_indices, axis=1)
+        # Create rhs of shape N x n_states x 1. This is required for linalg solv
+        rhs = tf.expand_dims(rhs_rew_mat, axis=2) 
+
+        ## Build lhs matrix for solving linear equations
+        
+
 
     # Part 3: reformulating Whittle index computation as a solution to a linear equation.
     #         Since now we know which argmax holds in Bellman equation, we can express Whittle index as a solution to a linear equation.
