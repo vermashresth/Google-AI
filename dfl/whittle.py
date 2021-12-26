@@ -95,21 +95,39 @@ def newWhittleIndex(P, R, gamma=0.99):
     
     # Loop over each state
     for state in range(n_states):
-        # Define indicator matrix `A`
-        indicator_mat = np.zeros((n_states+1, 2*n_states))
-        # Loop over all states and their corresponding argmax actions
-        for s_prime, a_argmax in enumerate(action_max_Q):
-            if a_argmax == 0: # first equation
-                indicator_mat[s_prime, 2*s_prime-1] = 1
+        # Define batch of indicator matrix `A`
+        indicator_mat = np.zeros((N, n_states+1, 2*n_states))
+
+        # Since indicator is dependent on both argmax action and state,
+        # obtain batch indices and states correponding to every element in
+        # action_max_Q array
+        batch_indices, s_primes = np.meshgrid(np.arange(action_max_Q.shape[0]),
+                                             np.arange(action_max_Q.shape[1]),
+                                             indexing='ij')
+        # Define a function which returns marked index given scaler batch idx, state, argmax action
+        def indicate_index_fn(batch_idx, s, a):
+            if a==0: # corresponds to first equation
+                return (batch_idx, s, 2*s-1)
             else:
-                indicator_mat[s_prime, 2*s_prime] = 1
+                return (batch_idx, s, 2*s)
+
+        # Vectrize the indicate function
+        vec_indicate_index_fn = np.vectorize(indicate_index_fn)
+
+        # We will get three vectors as output correponding to the indices of three dimensions
+        # of indicator_mat which have to be marked as 1
+        output_index_seq = vec_indicate_index_fn(batch_indices.flatten(),
+                                    s_primes.flatten(),
+                                    action_max_Q.flatten())
+        indicator_mat[output_index_seq] = 1
+
         # For m+1 th entry, take inverse of entry for s = `state`
-        last_a_argmax = int(not action_max_Q[state]) # Note action not selected earlier for s = state
-        if last_a_argmax == 0:
-            # Set indicator matrix's last entry
-            indicator_mat[-1, 2*state-1] = 1 # First equation
-        else:
-            indicator_mat[-1, 2*state] = 1
+        # Review: This assumes binary action 0 or 1
+        last_a_argmax = np.logical_not(action_max_Q[:, state]).astype(int) # Note action not selected earlier for s = state
+        output_last_index_seq = vec_indicate_index_fn(np.arange(N), # all batch indices
+                                                      np.array([state]*N), # same s=state for all batches
+                                                      last_a_argmax) # inverted argmax actions of s=state for all batches
+        indicator_mat[output_last_index_seq] = 1
 
         ## Build the rhs matrix for solving linear equations
         rhs_zeros = tf.zeros((N, n_states))
@@ -122,7 +140,7 @@ def newWhittleIndex(P, R, gamma=0.99):
         rhs = tf.expand_dims(rhs_rew_mat, axis=2) 
 
         ## Build lhs matrix for solving linear equations
-        
+
 
 
     # Part 3: reformulating Whittle index computation as a solution to a linear equation.
