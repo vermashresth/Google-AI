@@ -44,7 +44,7 @@ def newWhittleIndex(P, R, gamma=0.99):
 
     # initialize upper and lower bounds
     w_ub = np.ones((N, n_states))  # Whittle index upper bound
-    w_lb = np.zeros((N, n_states)) # Whittle index lower bound
+    w_lb = -np.ones((N, n_states)) # Whittle index lower bound
     w = (w_ub + w_lb) / 2
 
     n_binary_search_iters = 20 # Using a fixed # of iterations or a tolerance rate instead
@@ -84,7 +84,6 @@ def newWhittleIndex(P, R, gamma=0.99):
     # outcome: w = (w_ub + w_lb) / 2
     w = (w_ub + w_lb) / 2
 
-
     # action_max_Q stores the information mentioned below
     # Part 2: figure out which set of argmax in the Bellman equation holds.
     #         V[state] = argmax 0 + w + sum_{next_state} P_passive[state, next_state] V[next_state]
@@ -94,6 +93,7 @@ def newWhittleIndex(P, R, gamma=0.99):
     # This vector will later be used to formulate the corresponding linear equation that Whittle should satisfy.
     
     # Loop over each state
+    w_list = []
     for state in range(n_states):
         # Define batch of indicator matrix `A`
         indicator_mat = np.zeros((N, n_states+1, 2*n_states))
@@ -107,9 +107,10 @@ def newWhittleIndex(P, R, gamma=0.99):
         # Define a function which returns marked index given scaler batch idx, state, argmax action
         def indicate_index_fn(batch_idx, s, a):
             if a==0: # corresponds to first equation
-                return (batch_idx, s, 2*s-1)
-            else:
                 return (batch_idx, s, 2*s)
+            else:
+                return (batch_idx, s, 2*s+1)
+            # returns three different vectors containing indices for the three dimensions
 
         # Vectrize the indicate function
         vec_indicate_index_fn = np.vectorize(indicate_index_fn)
@@ -127,21 +128,49 @@ def newWhittleIndex(P, R, gamma=0.99):
         output_last_index_seq = vec_indicate_index_fn(np.arange(N), # all batch indices
                                                       np.array([state]*N), # same s=state for all batches
                                                       last_a_argmax) # inverted argmax actions of s=state for all batches
-        indicator_mat[output_last_index_seq] = 1
+        
+        indicator_mat[output_last_index_seq[0], # indices for batch dimension
+                      np.array([n_states]*N), # same index (last row) for all batches
+                      output_last_index_seq[2] # indices for chosen argmax
+                      ] = 1
 
         ## Build the rhs matrix for solving linear equations
-        rhs_zeros = tf.zeros((N, n_states))
-        # Get concatenated matrix with values [-r(0), -r(1), ..., 0, 0 ]
-        rhs_rew_and_zeros = tf.concat([-1*R, rhs_zeros], axis=1)
-        # Rreorder upper matrix to get [-r(0), 0, -r(1), 0]
-        reorder_indices = [j if j%2==0 else n_states+j for j in range(n_states)]
-        rhs_rew_mat = tf.gather(rhs_rew_and_zeros, reorder_indices, axis=1)
-        # Create rhs of shape N x n_states x 1. This is required for linalg solv
-        rhs = tf.expand_dims(rhs_rew_mat, axis=2) 
+        rhs = tf.repeat(-1*R, 2, axis=1) # obtain vector [-r(0), -r(0), -r(1), -r(1), ...]
+        rhs = tf.expand_dims(rhs, axis=2) # outputs rhs of shape N x 2*n_states x 1
+        rhs = tf.matmul(tf.constant(indicator_mat, dtype=tf.float32),
+                        rhs) # filter the rhs using indicator matrix
 
         ## Build lhs matrix for solving linear equations
 
+        # obtain P_matrix containing transition probabilities * gamma
+        lhs_P_mat = gamma*tf.reshape(P, (N, n_actions*n_states, n_states))
 
+        # Generate matrix to subtract from tranmsition probabilities depending on state
+        # Generate a matrix having 1 for [s, s] and 0 otherwise 
+        lhs_sub_matrix = np.eye(n_states)
+        # Generate a matrix having 1 for [2s, s] and [2s+1, s] and 0 otherwise
+        lhs_sub_matrix = np.repeat(lhs_sub_matrix, 2, axis=0)
+        # Generate a batch of matrices having 1 for [2s, s] and [2s+1, s] and 0 otherwise
+        lhs_sub_matrix = np.broadcast_to(lhs_sub_matrix, (N, 2*n_states, n_states))
+        
+        # subtract the sub_matrix
+        lhs_P_mat = lhs_P_mat - tf.constant(lhs_sub_matrix, dtype=tf.float32)
+
+        # generate the first column of lhs matrix, it should be column vector [1, 0, 1, 0, ...] 
+        # broadcasted to N batches
+        lhs_one_zero_matrix = np.broadcast_to([1, 0], (N, n_states, 2)).reshape(N, 2*n_states, 1)
+
+        # concatenate one zero column vector to p_matrix to obtain lhs matrix
+        lhs_mat = tf.concat([tf.constant(lhs_one_zero_matrix, dtype=tf.float32), lhs_P_mat],
+                      axis=2)
+        # Filter lhs mat using indicator matrix
+        lhs = tf.matmul(tf.constant(indicator_mat, dtype=tf.float32),
+                        lhs_mat)
+
+        # Solve batch of linear equations
+        solution = tf.linalg.solve(lhs, rhs) # matrix of shape N, m+1
+        w_state = solution[:, :1, 0] # vector of shape N, 1
+        w_list.append(w_state)
 
     # Part 3: reformulating Whittle index computation as a solution to a linear equation.
     #         Since now we know which argmax holds in Bellman equation, we can express Whittle index as a solution to a linear equation.
@@ -150,7 +179,7 @@ def newWhittleIndex(P, R, gamma=0.99):
     # Express w, V as a solutions to linear equations.
     # w = tf.linalg.solve(compute_the_chosen_matrix(P, R, gamma, indicator_function), rhs)
 
-    return w
+    return tf.concat(w_list, axis=1)
 
 def whittleIndex(P, gamma=0.99):
     '''
