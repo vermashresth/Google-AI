@@ -3,9 +3,10 @@ from dfl.utils import getSoftTopk
 from armman.simulator import getTopk
 
 class baseEnv:
-    def __init__(self, N, T_data, n_states, n_actions, seed):
+    def __init__(self, N, T_data, R_data, n_states, n_actions, seed):
         self.N = N
         self.T_data = T_data
+        self.R_data = R_data
         self.n_states = n_states
         self.n_actions = n_actions
         np.random.seed(seed)
@@ -25,43 +26,50 @@ class baseEnv:
 
         next_states = vec_multinomial(self.T_data[np.arange(self.N), states, np.array(actions).astype(int), :])
         return next_states
-    
+
+    def getRewards(self, states, actions):
+        rewards = self.R_data[np.arange(self.N), states]
+        return rewards
+
     def getStartState(self):
         return np.random.multinomial(1, [1/self.n_states]*self.n_states, self.N).argmax(axis=1)
 
 class armmanEnv(baseEnv):
-    def __init__(self, N, T_data, seed):
+    def __init__(self, N, T_data, R_data, seed):
         
         # Review: Remember, in OPE sticthed, we use n_states from global config
         n_states = 2
         n_actions = 2
-        super().__init__(N, T_data, n_states, n_actions, seed)
+        super().__init__(N, T_data, R_data, n_states, n_actions, seed)
     
-    def getRewards(self, states):
-        # Env specific reward function
-        return np.copy(states)
-
-
-class dummy3StatesEnv(baseEnv):
-    def __init__(self, N, T_data, seed):
-        
-        n_states = 3
-        n_actions = 2
-        super().__init__(N, T_data, n_states, n_actions, seed)
-    
-    def getRewards(self, states):
-        # Env specific reward function
-        return np.copy(states)
+    # def getRewards(self, states):
+    #     # Env specific reward function
+    #     return np.copy(states)
 
 class generalEnv(baseEnv):
+    def __init__(self, N, T_data, R_data, seed):
+        
+        # Figure out n_states and n_actions from T_data
+        n_states = T_data.shape[1]
+        n_actions = T_data.shape[2]
+
+        super().__init__(N, T_data, R_data, n_states, n_actions, seed)
+    
+    # def getRewards(self, states):
+    #     # Env specific reward function
+    #     return np.copy(states)
+
+class pomdpEnv(baseEnv):
     def __init__(self, N, T_data, seed):
         
+        # TODO: POMDP implementation
         # Figure out n_states and n_actions from T_data
         n_states = T_data.shape[1]
         n_actions = T_data.shape[2]
 
         super().__init__(N, T_data, n_states, n_actions, seed)
     
-    def getRewards(self, states):
-        # Env specific reward function
-        return np.copy(states)
+    # def getRewards(self, states):
+    #     # TODO: POMDP reward
+    #     # Env specific reward function
+    #     return np.copy(states)

@@ -7,7 +7,7 @@ sys.path.insert(0, "../")
 
 from dfl.model import ANN
 from dfl.synthetic import generateDataset
-from dfl.whittle import whittleIndex
+from dfl.whittle import whittleIndex, newWhittleIndex
 from dfl.utils import getSoftTopk
 from dfl.ope import opeIS, opeIS_parallel
 
@@ -23,7 +23,7 @@ if __name__ == '__main__':
     n_trials = 10
     L = 10
     K = 10
-    n_states = 2
+    n_states = 3
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
@@ -48,15 +48,17 @@ if __name__ == '__main__':
         for mode, dataset in dataset_list:
             loss_list = []
             ope_list = []
-            for (feature, label, traj, simulated_rewards, mask, state_record, action_record) in tqdm.tqdm(dataset):
+            for (feature, label, R_data, traj, simulated_rewards, mask, state_record, action_record) in tqdm.tqdm(dataset):
                 feature, label = tf.constant(feature, dtype=tf.float32), tf.constant(label, dtype=tf.float32)
+                R_data = tf.constant(R_data, dtype=tf.float32)
 
                 with tf.GradientTape() as tape:
                     prediction = model(feature) # Transition probabilities
                     loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
 
                     # Batch Whittle index computation
-                    w = whittleIndex(prediction)
+                    # w = whittleIndex(prediction)
+                    w = newWhittleIndex(prediction, R_data)
                     
                     # ========== Non-parallel version of OPE implementation ===========
                     # This is fine in the inference part but can be slow in the training part

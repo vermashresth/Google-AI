@@ -6,7 +6,7 @@ import tqdm
 from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
 from dfl.policy import getActions
 from dfl.utils import getBenefsByCluster
-from dfl.environments import armmanEnv, dummy3StatesEnv
+from dfl.environments import armmanEnv, generalEnv, pomdpEnv
 
 # from armman.simulator import takeActions
 
@@ -60,13 +60,12 @@ def simulateTrajectories(args, env, k, w, start_state=None):
                 action_record[tr, pol_idx, timestep, :] = np.copy(actions)
                 traj[tr, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
 
-                ## Transition to next state
+                ## Transition to next state and get rewards
                 next_states = env.takeActions(states, actions)
+                rewards = env.getRewards(states, actions)
                 traj[tr, pol_idx, timestep, dim_dict['next_state'], :] = np.copy(next_states)
 
-                # Get rewards
-                # rewards = env.getRewards(next_states)
-                rewards = np.copy(states)
+                # rewards = np.copy(states)
                 traj[tr, pol_idx, timestep, dim_dict['reward'], :] = np.copy(rewards)
                 
                 states = next_states
@@ -85,7 +84,7 @@ def simulateTrajectories(args, env, k, w, start_state=None):
 
 
 def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
-                             env = 'armman', T_data=None, w=None, start_state=None, debug=False, replace=False):
+                             env = 'armman', T_data=None, R_data=None, w=None, start_state=None, debug=False, replace=False):
 
     # Set args params
     args = {}
@@ -104,13 +103,15 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     np.random.seed(int(seed))
     if env=='armman':
         envClass = armmanEnv
-    elif env=='dummy_3':
-        envClass = dummy3StatesEnv
+    elif env=='general':
+        envClass = generalEnv
+    elif env=='POMDP':
+        envClass = pomdpEnv
     else:
         print(f'{env} not supported!!')
         raise
     env = envClass(N=n_benefs,
-                    T_data=T_data[mask],
+                    T_data=T_data[mask], R_data=R_data[mask],
                     seed = seed)
     
     assert(T_data.shape[2] == 2) # 2 actions
