@@ -1,5 +1,6 @@
 import argparse
 import matplotlib.pyplot as plt
+from dfl.config import N_STATES
 import numpy as np
 import pandas as pd
 import pickle
@@ -16,7 +17,7 @@ def get_reward(R, state, action, m):
     if not action: # Passive action
         rewards += m # Add subsidy
     return rewards
-    
+
 def newWhittleIndex(P, R, gamma=0.99):
     '''
     Inputs:
@@ -47,30 +48,35 @@ def newWhittleIndex(P, R, gamma=0.99):
     w_lb = -np.ones((N, n_states)) # Whittle index lower bound
     w = (w_ub + w_lb) / 2
 
-    n_binary_search_iters = 20 # Using a fixed # of iterations or a tolerance rate instead
-    n_value_iters = 100
+    n_binary_search_iters = 10 # Using a fixed # of iterations or a tolerance rate instead
+    n_value_iters = 10
 
     for _ in range(n_binary_search_iters):
         w = (w_ub + w_lb) / 2
         # initialize value function
         V = np.zeros((N, n_states))
-        action_max_Q = np.zeros((N, n_states)) # vector to store which of action results in max Q
         for _ in range(n_value_iters): # value iteration to update V
-            # Reset Q values in every value iteration
-            Q = np.zeros((N, n_states, n_actions)) 
-            # Iterate over state, action, new_state
-            for state in range(n_states):
-                for action in range(n_actions):
-                    for new_state in range(n_states):
-                        # Compute reward given the subsidy
-                        rew = get_reward(tmp_R, state, action, w[:, state]) # vector of size N
-                        # Update Q value for the current state and action
-                        Q[:, state, action] += tmp_P[:, state, action, new_state] * \
-                            (rew + gamma*V[:, new_state])
-                # Update Value by taking max of Q over actions
-                V[:, state] = np.max(Q[:, state, :], axis=1)
-                # Note the action which resulted in max Q value
-                action_max_Q[:, state] = np.argmax(Q[:, state, :], axis=1)
+
+            # V is originally of shape N x n_states
+            # repeat V to make it of same shape as tmp_P, i.e., N x n_states x n_actions x n_states
+            V_mat = V.reshape((N, 1, 1, n_states)).repeat(n_states, axis=1).repeat(n_actions, axis=2)
+            
+            # tmp_R is originally of shape N x n_states
+            # repeat reward matrix to make it of same shape as tmp_P
+            rewards_mat = tmp_R.numpy().reshape((N, 1, 1, n_states)).repeat(n_states, axis=1).repeat(n_actions, axis=2)
+
+            # w is originally of shape N x n_states
+            # repeat w to make it of shape N x n_states x n_states to be added to passive action in reward_mat
+            w_mat = w.reshape((N, 1, n_states)).repeat(n_states, axis=1)
+            
+            # Add subsidy to passive action
+            rewards_mat[:, :, 0, :]  = rewards_mat[:, :, 0, :] + w_mat 
+
+            # Compute discounted future rew
+            out_mat = tmp_P * (rewards_mat + gamma*V_mat)
+            Q = np.sum(out_mat, axis=3) # Q is aggregated over new_state
+            V = np.max(Q, axis=2) # Find V as max over actions
+            action_max_Q = np.argmax(Q, axis=2) # Note which action gives the max Q
 
         # Compute an indicator vector to mark if Whittle index is too large or too small
         # comparison = (value of not call > value of call) # a vector of size N to indicate if w is too large or not
