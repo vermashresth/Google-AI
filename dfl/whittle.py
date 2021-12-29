@@ -187,7 +187,7 @@ def newWhittleIndex(P, R, gamma=0.99):
         w_solution = solution[:, :1, 0] # vector of shape N, 1
         w_list.append(w_solution)
 
-    return tf.concat(w_list, axis=1), w, w_lb, w_ub
+    return tf.concat(w_list, axis=1)
 
 def whittleIndex(P, gamma=0.99):
     '''
@@ -254,7 +254,7 @@ def whittleIndex(P, gamma=0.99):
     ## Following line implements condition checking when candidate1 is correct
     ## It results in an array of size N, with value 1 if candidate1 is correct else 0.
     cand1_s0_mask= tf.constant(1.0*(c1s0[:, 0] + 1.0 + gamma*(Pnp[:,1,0,0]*c1s0[:,1] + Pnp[:,1,0,1]*c1s0[:,2]) >= 1.0+ gamma* (Pnp[:,1,1,0]*c1s0[:,1] + Pnp[:,1,1,1]*c1s0[:,2])), dtype=tf.float32)
-    cand1_s1_mask= tf.constant(1.0*(c1s1[:, 0] + gamma*(Pnp[:,0,0,0]*c1s0[:,1] + Pnp[:,0,0,1]*c1s0[:,2]) >=  gamma* (Pnp[:,1,0,0]*c1s0[:,1] + Pnp[:,1,0,1]*c1s0[:,2])), dtype=tf.float32)
+    cand1_s1_mask= tf.constant(1.0*(c1s1[:, 0] + gamma*(Pnp[:,0,0,0]*c1s1[:,1] + Pnp[:,0,0,1]*c1s1[:,2]) >=  gamma* (Pnp[:,0,1,0]*c1s1[:,1] + Pnp[:,0,1,1]*c1s1[:,2])), dtype=tf.float32)
 
     cand2_s0_mask= (1.0- cand1_s0_mask)
     cand2_s1_mask= (1.0- cand1_s1_mask)
