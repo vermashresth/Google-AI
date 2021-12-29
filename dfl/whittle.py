@@ -43,64 +43,66 @@ def newWhittleIndex(P, R, gamma=0.99):
     N, n_states = P.shape[0], P.shape[1]
     tmp_P, tmp_R = tf.stop_gradient(P), tf.stop_gradient(R)
 
-    # initialize upper and lower bounds
+    # initialize upper and lower bounds for binary search
     w_ub = np.ones((N, n_states))  # Whittle index upper bound
-    w_lb = -np.ones((N, n_states)) # Whittle index lower bound
+    w_lb = np.zeros((N, n_states)) # Whittle index lower bound
     w = (w_ub + w_lb) / 2
 
-    n_binary_search_iters = 10 # Using a fixed # of iterations or a tolerance rate instead
-    n_value_iters = 10
-
-    for _ in range(n_binary_search_iters):
-        w = (w_ub + w_lb) / 2
-        # initialize value function
-        V = np.zeros((N, n_states))
-        for _ in range(n_value_iters): # value iteration to update V
-
-            # V is originally of shape N x n_states
-            # repeat V to make it of same shape as tmp_P, i.e., N x n_states x n_actions x n_states
-            V_mat = V.reshape((N, 1, 1, n_states)).repeat(n_states, axis=1).repeat(n_actions, axis=2)
-            
-            # tmp_R is originally of shape N x n_states
-            # repeat reward matrix to make it of same shape as tmp_P
-            rewards_mat = tmp_R.numpy().reshape((N, 1, 1, n_states)).repeat(n_states, axis=1).repeat(n_actions, axis=2)
-
-            # w is originally of shape N x n_states
-            # repeat w to make it of shape N x n_states x n_states to be added to passive action in reward_mat
-            w_mat = w.reshape((N, 1, n_states)).repeat(n_states, axis=1)
-            
-            # Add subsidy to passive action
-            rewards_mat[:, :, 0, :]  = rewards_mat[:, :, 0, :] + w_mat 
-
-            # Compute discounted future rew
-            out_mat = tmp_P * (rewards_mat + gamma*V_mat)
-            Q = np.sum(out_mat, axis=3) # Q is aggregated over new_state
-            V = np.max(Q, axis=2) # Find V as max over actions
-            action_max_Q = np.argmax(Q, axis=2) # Note which action gives the max Q
-
-        # Compute an indicator vector to mark if Whittle index is too large or too small
-        # comparison = (value of not call > value of call) # a vector of size N to indicate if w is too large or not
-        comparison = (Q[:, :, 0] > Q[:, :, 1]).astype(int)
-        
-        # TODO: Might want to update whittle indices for only those (arms, states) having abs(q_diff) more than a Q_delta  
-        # Update lower and upper bounds of whittle index binary search
-        w_ub = w_ub - (w_ub - w_lb) / 2 * comparison
-        w_lb = w_lb + (w_ub - w_lb) / 2 * (1 - comparison)
-
-    # outcome: w = (w_ub + w_lb) / 2
-    w = (w_ub + w_lb) / 2
-
-    # action_max_Q stores the information mentioned below
-    # Part 2: figure out which set of argmax in the Bellman equation holds.
-    #         V[state] = argmax 0 + w + sum_{next_state} P_passive[state, next_state] V[next_state]
-    #                           R[state] + sum_{next_state} P_active[state, next_state] V[next_state]
-    # In total, there are n_states-1 argmax, each with 2 actions. 
-    # You can maintain a vector of size (N, n_states, ) to mark which one in the argmax holds.
-    # This vector will later be used to formulate the corresponding linear equation that Whittle should satisfy.
+    n_binary_search_iters = 30 # Using a fixed # of iterations or a tolerance rate instead
+    n_value_iters = 1000
     
-    # Loop over each state
+    # list to store whittle indices outputted from solving linear equations
     w_list = []
-    for state in range(n_states):
+
+    # Run binary search for finding whittle index corresponding to each state
+    for wh_state in range(n_states):
+        for _ in range(n_binary_search_iters):
+            w[:, wh_state] = (w_ub[:, wh_state] + w_lb[:, wh_state]) / 2
+
+            # initialize value function
+            V = np.zeros((N, n_states))
+            for _ in range(n_value_iters): # value iteration to update V
+
+                # V is originally of shape N x n_states
+                # repeat V to make it of same shape as tmp_P, i.e., N x n_states x n_actions x n_states
+                V_mat = V.reshape((N, 1, 1, n_states)).repeat(n_states, axis=1).repeat(n_actions, axis=2)
+                
+                # tmp_R is originally of shape N x n_states
+                # repeat reward matrix to make it of same shape as tmp_P
+                rewards_mat = tmp_R.numpy().reshape((N, n_states, 1, 1)).repeat(n_states, axis=3).repeat(n_actions, axis=2)
+
+                # w is originally of shape N x n_states
+                # repeat w to make it of shape N x n_states x n_states to be added to passive action in reward_mat
+                w_mat = w[:, wh_state].reshape((N, 1, 1)).repeat(n_states, axis=1).repeat(n_states, axis=2)
+
+                # Add subsidy to passive action
+                rewards_mat[:, :, 0, :]  = rewards_mat[:, :, 0, :] + w_mat 
+
+                # Compute discounted future rew
+                out_mat = tmp_P * (rewards_mat + gamma*V_mat)
+                Q = np.sum(out_mat, axis=3) # Q is aggregated over new_state
+                V = np.max(Q, axis=2) # Find V as max over actions
+
+            # Compute an indicator vector to mark if Whittle index is too large or too small
+            # comparison = (value of not call > value of call) # a vector of size N to indicate if w is too large or not
+            comparison = (Q[:, wh_state, 0] > Q[:, wh_state, 1]).astype(int)
+            
+            # TODO: Might want to update whittle indices for only those (arms, states) having abs(q_diff) more than a Q_delta  
+            # Update lower and upper bounds of whittle index binary search
+            w_ub[:, wh_state] = w_ub[:, wh_state] - (w_ub[:, wh_state] - w_lb[:, wh_state]) / 2 * comparison
+            w_lb[:, wh_state] = w_lb[:, wh_state] + (w_ub[:, wh_state] - w_lb[:, wh_state]) / 2 * (1 - comparison)
+
+        # For every wh_state, note which action gives the max Q for all POMDP states
+        action_max_Q = np.argmax(Q, axis=2)
+
+        # action_max_Q stores the information mentioned below
+        # Part 2: figure out which set of argmax in the Bellman equation holds.
+        #         V[state] = argmax 0 + w + sum_{next_state} P_passive[state, next_state] V[next_state]
+        #                           R[state] + sum_{next_state} P_active[state, next_state] V[next_state]
+        # In total, there are n_states-1 argmax, each with 2 actions. 
+        # You can maintain a vector of size (N, n_states, ) to mark which one in the argmax holds.
+        # This vector will later be used to formulate the corresponding linear equation that Whittle should satisfy.
+    
         # Define batch of indicator matrix `A`
         indicator_mat = np.zeros((N, n_states+1, 2*n_states))
 
@@ -130,15 +132,19 @@ def newWhittleIndex(P, R, gamma=0.99):
 
         # For m+1 th entry, take inverse of entry for s = `state`
         # Review: This assumes binary action 0 or 1
-        last_a_argmax = np.logical_not(action_max_Q[:, state]).astype(int) # Note action not selected earlier for s = state
+        last_a_argmax = np.logical_not(action_max_Q[:, wh_state]).astype(int) # Note action not selected earlier for s = state
         output_last_index_seq = vec_indicate_index_fn(np.arange(N), # all batch indices
-                                                      np.array([state]*N), # same s=state for all batches
+                                                      np.array([wh_state]*N), # same s=state for all batches
                                                       last_a_argmax) # inverted argmax actions of s=state for all batches
         
         indicator_mat[output_last_index_seq[0], # indices for batch dimension
                       np.array([n_states]*N), # same index (last row) for all batches
                       output_last_index_seq[2] # indices for chosen argmax
                       ] = 1
+
+        # Part 3: reformulating Whittle index computation as a solution to a linear equation.
+        #         Since now we know which argmax holds in Bellman equation, we can express Whittle index as a solution to a linear equation.
+        #         We will keep tracking gradient in this part and recompute the Whittle index again to allow Tensorflow to backpropagate.
 
         ## Build the rhs matrix for solving linear equations
         rhs = tf.repeat(-1*R, 2, axis=1) # obtain vector [-r(0), -r(0), -r(1), -r(1), ...]
@@ -173,19 +179,15 @@ def newWhittleIndex(P, R, gamma=0.99):
         lhs = tf.matmul(tf.constant(indicator_mat, dtype=tf.float32),
                         lhs_mat)
 
+        # Express w, V as a solutions to linear equations.
+        # w = tf.linalg.solve(compute_the_chosen_matrix(P, R, gamma, indicator_function), rhs)
+
         # Solve batch of linear equations
         solution = tf.linalg.solve(lhs, rhs) # matrix of shape N, m+1
-        w_state = solution[:, :1, 0] # vector of shape N, 1
-        w_list.append(w_state)
+        w_solution = solution[:, :1, 0] # vector of shape N, 1
+        w_list.append(w_solution)
 
-    # Part 3: reformulating Whittle index computation as a solution to a linear equation.
-    #         Since now we know which argmax holds in Bellman equation, we can express Whittle index as a solution to a linear equation.
-    #         We will keep tracking gradient in this part and recompute the Whittle index again to allow Tensorflow to backpropagate.
-
-    # Express w, V as a solutions to linear equations.
-    # w = tf.linalg.solve(compute_the_chosen_matrix(P, R, gamma, indicator_function), rhs)
-
-    return tf.concat(w_list, axis=1)
+    return tf.concat(w_list, axis=1), w, w_lb, w_ub
 
 def whittleIndex(P, gamma=0.99):
     '''
