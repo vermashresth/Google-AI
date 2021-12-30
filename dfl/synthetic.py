@@ -64,13 +64,13 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
         sim_seed = i  # just a randomness
         mask_seed = i # just a randomness
         traj, sim_whittle, simulated_rewards, mask, \
-                state_record, action_record = getSimulatedTrajectories(
-                                                n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
-                                                seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
-                                                w=w, replace=False
-                                                )
+                state_record, action_record, reward_record = getSimulatedTrajectories(
+                                                                n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
+                                                                seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
+                                                                w=w, replace=False
+                                                                )
 
-        instance = (feature, raw_T_data, raw_R_data, traj, simulated_rewards, mask, state_record, action_record)
+        instance = (feature, raw_T_data, raw_R_data, traj, simulated_rewards, mask, state_record, action_record, reward_record)
         print('average simulated rewards (random, rr, whittle):', np.mean(simulated_rewards, axis=0))
         dataset.append(instance)
 

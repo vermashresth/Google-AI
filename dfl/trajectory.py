@@ -86,7 +86,7 @@ def simulateTrajectories(args, env, k, w, gamma, start_state=None):
         #     print("Expected reward of policy %s is %s"%(policy_names[pol], \
         #                         np.mean(simulated_rewards[:,policies.index(pol)])))
   
-    return simulated_rewards, state_record, action_record, traj
+    return simulated_rewards, state_record, action_record, reward_record, traj
 
 
 def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
@@ -116,13 +116,13 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     assert(T_data.shape[1] == T_data.shape[3] == env.n_states) # n_states
 
     # Run simulation
-    simulated_rewards, state_record, action_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state)
+    simulated_rewards, state_record, action_record, reward_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state)
 
     if debug:
         print(mask[:10])
         print('trajectory shape: ', np.array(traj).shape) 
     whittle_rew = simulated_rewards[:, 2].mean()
-    return traj, whittle_rew, simulated_rewards, mask, state_record, action_record
+    return traj, whittle_rew, simulated_rewards, mask, state_record, action_record, reward_record
 
     
 def getBenefsEmpProbs(traj, benef_ids, policy_id, trial_id, min_sup = 1, decomposed=False):

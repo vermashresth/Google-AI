@@ -55,10 +55,10 @@ def run_all_synthetic(T_data, w, cluster_ids):
     for sim_seed in tqdm.tqdm(range(n_sim_epochs), desc='Seeded Run'):
         print('Seed ', sim_seed)
         traj, sim_whittle, simulated_rewards, mask, \
-                        state_record, action_record = getSimulatedTrajectories(
-                                                        n_benefs, T, K, n_trials, gamma,
-                                                        sim_seed, mask_seed, T_data, w
-                                                        )
+            state_record, action_record, reward_record = getSimulatedTrajectories(
+                                                            n_benefs, T, K, n_trials, gamma,
+                                                            sim_seed, mask_seed, T_data, w
+                                                            )
         
         
         opeIS_naive = opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma,
@@ -140,7 +140,7 @@ def run_all_synthetic(T_data, w, cluster_ids):
             # result_dict[f'similarity-{traj_sample_size}'] = opeIS_similarity_i
         
         est_T_data = aux_dict_to_transition_matrix(aux_dict_ssa, n_benefs)
-        _, OPE_sim_whittle, _, _, _, _ = getSimulatedTrajectories(
+        _, OPE_sim_whittle, _, _, _, _, _ = getSimulatedTrajectories(
                                                     n_benefs, T, K, OPE_sim_n_trials, gamma,
                                                     sim_seed, mask_seed, est_T_data, w
                                                     )

@@ -1,8 +1,12 @@
 import tensorflow as tf
 import numpy as np
 import tqdm
+
 from dfl.policy import getActionProb, getActionProbNaive, getProbs
 from dfl.config import dim_dict, policy_map
+from dfl.trajectory import getSimulatedTrajectories
+from dfl.trajectory import getEmpProbBenefLookup, getEmpProbClusterLookup, augmentTraj
+from dfl.utils import aux_dict_to_transition_matrix
 
 def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
     compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}
@@ -61,13 +65,12 @@ def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, be
     return ope
 
 #This is the parallelized implementation of the same OPE. Ideally these two should match but the parallelized version is faster.
-def opeIS_parallel(state_record, action_record, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
+def opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
     compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}
     gamma_series = np.array([gamma**t for t in range(T-1)])
 
     ntr, _, L, N = state_record.shape
 
-    # TODO: The above version is too slow. We have to implement a parallel version.
     v = []
     w_mask = tf.gather(w, mask) if tf.is_tensor(w) else w[mask] # Added the tensorflow version to support tensorflow indexing
 
@@ -92,7 +95,7 @@ def opeIS_parallel(state_record, action_record, w, mask, n_benefs, T, K, n_trial
     total_probs = np.ones((ntr, N))
     ope = 0
     for t in range(T-1):
-        rewards = state_record[:,compare['beh'],t,:] # current state
+        rewards = reward_record[:, compare['beh'], t, :] # state_record[:,compare['beh'],t,:] # current state
         total_probs = total_probs * IS_weights[:,t,:]
         ope += rewards * total_probs * gamma_series[t]
 
@@ -144,3 +147,31 @@ def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_nam
     ope = np.mean(v)
     print(f'OPE Naive: {ope}')
     return ope
+
+# Simulation-based OPE (differentiable and parallelizable)
+class opeSimulation(object): # TODO
+    def __init__(self, beh_traj, mask_seed, n_benefs, T, K, OPE_sim_n_trials, gamma, beh_policy_name):
+        self.mask_seed = mask_seed
+        self.n_benefs = n_benef
+        self.T = T
+        self.K = K
+        self.OPE_sim_n_trials = OPE_sim_n_trials
+        self.gamma = gamma
+
+        policy_id = policy_map[beh_policy_name]
+        emp_prob_by_benef_ssa, tr_df_benef_ssa, aux_dict_ssa = getEmpProbBenefLookup(beh_traj, policy_id, trial_id, n_benefs, True)
+        self.est_T_data = aux_dict_to_transition_matrix(aux_dict_ssa, n_benefs)
+
+    def __call__(self, w):
+        compute = tf.custom_gradient(lambda x: self._compute(x))
+        return compute(w)
+
+    def _compute(self, w):
+        traj, OPE_sim_whittle, simulated_rewards, mask, state_record, action_record, reward_record = getSimulatedTrajectories(
+                                                    self.n_benefs, self.T, self.K, self.OPE_sim_n_trials, gamma,
+                                                    sim_seed, mask_seed, self.est_T_data, w
+                                                    )
+
+        def gradient_function(dsoln):
+            return grad_w
+
