@@ -6,13 +6,13 @@ import tqdm
 from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
 from dfl.policy import getActions
 from dfl.utils import getBenefsByCluster
-from dfl.environments import armmanEnv, generalEnv, pomdpEnv
+from dfl.environments import generalEnv
 
 # from armman.simulator import takeActions
 
 from collections import defaultdict
 
-def simulateTrajectories(args, env, k, w, start_state=None):
+def simulateTrajectories(args, env, k, w, gamma, start_state=None):
 
     ##### Unpack arguments
     L=args['simulation_length']
@@ -23,7 +23,9 @@ def simulateTrajectories(args, env, k, w, start_state=None):
     n_policies = len(policies)
     state_record=np.zeros((ntr, n_policies, L, N))  # Store the full state
                                                     # trajectory
-    action_record=np.zeros((ntr, n_policies, L, N))  # Store the full state
+    action_record=np.zeros((ntr, n_policies, L, N))  # Store the full action
+                                                    # trajectory
+    reward_record=np.zeros((ntr, n_policies, L, N))  # Store the full reward
                                                     # trajectory
 
     simulated_rewards=np.zeros((ntr, n_policies)) # Store aggregate rewards
@@ -60,9 +62,12 @@ def simulateTrajectories(args, env, k, w, start_state=None):
                 action_record[tr, pol_idx, timestep, :] = np.copy(actions)
                 traj[tr, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
 
+                ## Get rewards
+                rewards = env.getRewards(states, actions)
+                reward_record[tr, pol_idx, timestep, :] = np.copy(rewards)
+                
                 ## Transition to next state and get rewards
                 next_states = env.takeActions(states, actions)
-                rewards = env.getRewards(states, actions)
                 traj[tr, pol_idx, timestep, dim_dict['next_state'], :] = np.copy(next_states)
 
                 # rewards = np.copy(states)
@@ -71,8 +76,9 @@ def simulateTrajectories(args, env, k, w, start_state=None):
                 states = next_states
 
             # Note Rewards
-            simulated_rewards[tr, pol_idx]=np.sum(np.sum(state_record[tr,pol_idx], \
-                                                        axis=1))
+            gamma_list = gamma ** np.arange(L)
+            discounted_reward_record = reward_record * gamma_list.reshape(1,1,L,1)
+            simulated_rewards[tr, pol_idx] = np.sum(discounted_reward_record[tr,pol_idx])
 
         
         ##### Print results
@@ -84,7 +90,7 @@ def simulateTrajectories(args, env, k, w, start_state=None):
 
 
 def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
-                             env = 'armman', T_data=None, R_data=None, w=None, start_state=None, debug=False, replace=False):
+                             T_data=None, R_data=None, w=None, start_state=None, H=10, debug=False, replace=False):
 
     # Set args params
     args = {}
@@ -93,7 +99,6 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     args['simulation_length']=T
     args['num_trials']=n_trials
     args['seed_base'] = seed
-    args['env'] = env
 
     # If transitions matrix is for larger number of benefs than `n_benefs`, generate a mask
     np.random.seed(mask_seed)
@@ -101,16 +106,9 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     
     # Define Simulation environment
     np.random.seed(int(seed))
-    if env=='armman':
-        envClass = armmanEnv
-    elif env=='general':
-        envClass = generalEnv
-    elif env=='POMDP':
-        envClass = pomdpEnv
-    else:
-        print(f'{env} not supported!!')
-        raise
-    env = envClass(N=n_benefs,
+
+    # Generate environment
+    env = generalEnv(N=n_benefs,
                     T_data=T_data[mask], R_data=R_data[mask],
                     seed = seed)
     
@@ -118,7 +116,7 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     assert(T_data.shape[1] == T_data.shape[3] == env.n_states) # n_states
 
     # Run simulation
-    simulated_rewards, state_record, action_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], start_state=start_state)
+    simulated_rewards, state_record, action_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state)
 
     if debug:
         print(mask[:10])

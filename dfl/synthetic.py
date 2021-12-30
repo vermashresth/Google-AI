@@ -7,8 +7,9 @@ from dfl.model import SyntheticANN
 from dfl.trajectory import getSimulatedTrajectories
 from dfl.utils import generateRandomTMatrix
 from dfl.whittle import whittleIndex, newWhittleIndex
+from dfl.environments import POMDP2MDP
 
-def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, run_whittle=False):
+def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env='general', H=10, run_whittle=False):
     # n_benefs: number of beneficiaries in a cohort
     # n_states: number of states
     # n_instances: number of cohorts in the whole dataset
@@ -23,7 +24,6 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, run_
 
     # Randomly initializing a neural network
     model = SyntheticANN()
-    env = 'armman' if n_states == 2 else 'general'
 
     # Prepare for parallelization
     state_matrix = np.zeros((n_instances, L, n_benefs))
@@ -32,15 +32,24 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, run_
     # Generating synthetic data
     for i in range(n_instances):
         # Generate transition probabilities
-        T_data = generateRandomTMatrix(n_benefs, n_states=n_states) # numpy array
+        raw_T_data = generateRandomTMatrix(n_benefs, n_states=n_states) # numpy array
 
         # Generate rewards from uniform distribution
         R = sorted(np.random.uniform(size=n_states))
         R = (R - np.min(R)) / np.ptp(R) # normalize rewards
-        R_data = np.repeat(R.reshape(1,-1), n_benefs, axis=0) # using the same rewards across all arms (for simplicity)
+        raw_R_data = np.repeat(R.reshape(1,-1), n_benefs, axis=0) # using the same rewards across all arms (for simplicity)
 
         # Generate features using the transition probabilities
-        feature = model(tf.constant(T_data.reshape(-1,2*n_states*n_states), dtype=tf.float32))
+        feature = model(tf.constant(raw_T_data.reshape(-1,2*n_states*n_states), dtype=tf.float32))
+
+        # Generate environment parameters
+        if env=='general':
+            T_data, R_data = raw_T_data, raw_R_data
+        elif env=='POMDP':
+            T_data, R_data = POMDP2MDP(tf.constant(raw_T_data, dtype=tf.float32), tf.constant(raw_R_data, dtype=tf.float32), H)
+            T_data, R_data = T_data.numpy(), R_data.numpy()
+            # print('raw R', raw_R_data)
+            # print('new R', R_data)
 
         # Different choices of Whittle indices
         if run_whittle:
@@ -48,19 +57,20 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, run_
             w = newWhittleIndex(tf.constant(T_data, dtype=tf.float32), \
                 tf.constant(R_data, dtype=tf.float32)).numpy() # New Whittle index computation. It should work for multiple states.
         else:
-            w = np.zeros((n_benefs, n_states)) # All zeros. This is to disable Whittle index policy to speed up simulation.
+            w = np.zeros((n_benefs, T_data.shape[1])) # All zeros. This is to disable Whittle index policy to speed up simulation.
         
-        assert w.shape == (n_benefs, n_states)
+        assert w.shape == (n_benefs, T_data.shape[1])
 
         sim_seed = i  # just a randomness
         mask_seed = i # just a randomness
         traj, sim_whittle, simulated_rewards, mask, \
                 state_record, action_record = getSimulatedTrajectories(
                                                 n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
-                                                seed=sim_seed, mask_seed=mask_seed, env=env, T_data=T_data, R_data=R_data, w=w, replace=False
+                                                seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
+                                                w=w, replace=False
                                                 )
 
-        instance = (feature, T_data, R_data, traj, simulated_rewards, mask, state_record, action_record)
+        instance = (feature, raw_T_data, raw_R_data, traj, simulated_rewards, mask, state_record, action_record)
         print('average simulated rewards (random, rr, whittle):', np.mean(simulated_rewards, axis=0))
         dataset.append(instance)
 
@@ -77,11 +87,13 @@ if __name__ == '__main__':
     # Testing data generation
     n_benefs = 50
     n_instances = 20
-    n_trials = 10
+    n_trials = 100
     L = 10
     K = 3
     n_states = 3
     gamma = 0.99
+    env = 'general'
+    H = 10
 
     T_data = generateRandomTMatrix(n_benefs, n_states=n_states)
-    dataset = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma=gamma, run_whittle=True)
+    dataset = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma=gamma, env=env, H=H, run_whittle=True)

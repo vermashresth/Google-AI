@@ -45,11 +45,11 @@ def newWhittleIndex(P, R, gamma=0.99):
 
     # initialize upper and lower bounds for binary search
     w_ub = np.ones((N, n_states))  # Whittle index upper bound
-    w_lb = np.zeros((N, n_states)) # Whittle index lower bound
+    w_lb = -np.ones((N, n_states)) # Whittle index lower bound
     w = (w_ub + w_lb) / 2
 
     n_binary_search_iters = 30 # Using a fixed # of iterations or a tolerance rate instead
-    n_value_iters = 1000
+    n_value_iters = 100
     
     # list to store whittle indices outputted from solving linear equations
     w_list = []

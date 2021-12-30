@@ -10,10 +10,12 @@ from dfl.synthetic import generateDataset
 from dfl.whittle import whittleIndex, newWhittleIndex
 from dfl.utils import getSoftTopk
 from dfl.ope import opeIS, opeIS_parallel
+from dfl.environments import POMDP2MDP
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ARMMAN decision-focused learning')
     parser.add_argument('--method', default='TS', type=str, help='TS (two-stage learning) or DF (decision-focused learning).')
+    parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
 
     args = parser.parse_args()
     print('argparser arguments', args)
@@ -28,8 +30,12 @@ if __name__ == '__main__':
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
 
+    # Environment setup
+    env = args.env
+    H = 10
+
     # dataset generation
-    full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma)
+    full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H)
     train_dataset = full_dataset[:int(n_instances*0.7)]
     val_dataset   = full_dataset[int(n_instances*0.7):int(n_instances*0.8)]
     test_dataset  = full_dataset[int(n_instances*0.8):]
@@ -48,17 +54,23 @@ if __name__ == '__main__':
         for mode, dataset in dataset_list:
             loss_list = []
             ope_list = []
-            for (feature, label, R_data, traj, simulated_rewards, mask, state_record, action_record) in tqdm.tqdm(dataset):
+            for (feature, label, raw_R_data, traj, simulated_rewards, mask, state_record, action_record) in tqdm.tqdm(dataset):
                 feature, label = tf.constant(feature, dtype=tf.float32), tf.constant(label, dtype=tf.float32)
-                R_data = tf.constant(R_data, dtype=tf.float32)
+                raw_R_data = tf.constant(raw_R_data, dtype=tf.float32)
 
                 with tf.GradientTape() as tape:
                     prediction = model(feature) # Transition probabilities
                     loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
 
+                    # Setup MDP or POMDP environment
+                    if env=='general':
+                        T_data, R_data = prediction, raw_R_data
+                    elif env=='POMDP':
+                        T_data, R_data = POMDP2MDP(prediction, raw_R_data, H)
+                    
                     # Batch Whittle index computation
                     # w = whittleIndex(prediction)
-                    w = newWhittleIndex(prediction, R_data)
+                    w = newWhittleIndex(T_data, R_data)
                     
                     # ========== Non-parallel version of OPE implementation ===========
                     # This is fine in the inference part but can be slow in the training part
