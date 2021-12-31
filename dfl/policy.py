@@ -23,19 +23,35 @@ def getActions(states, policy, ts, w, k):
     elif policy == 2:
         # select k arms by Whittle
         N = len(states)
-        actions=np.zeros(N)
-        whittle_indices=w[np.arange(N), states]
+        actions = np.zeros(N)
+        whittle_indices = w[np.arange(N), states]
 
-        top_k_whittle=getTopk(whittle_indices, k)
+        top_k_whittle = getTopk(whittle_indices, k)
         actions[top_k_whittle] = 1
     elif policy == 3:
         # select k arms by Whittle using soft top k
         N = len(states)
-        actions=np.zeros(N)
-        whittle_indices=w[np.arange(N), states]
+        actions = np.zeros(N)
+        whittle_indices = w[np.arange(N), states]
+        whittle_indices = tf.convert_to_tensor([whittle_indices], dtype=tf.float32)
 
-        soft_top_k_whittle=getSoftTopk([whittle_indices], k)
+        soft_top_k_whittle=getSoftTopk(whittle_indices, k)
         actions[soft_top_k_whittle] = 1
+
+    return actions.astype('int64')
+
+def getSoftActions(states, policy, ts, w, k):
+    # policy 3: soft whittle index
+    # This function supports batch access
+    # select k arms by Whittle using soft top k
+    ntr, N = states.shape
+    actions = np.zeros((ntr, N))
+    whittle_indices = [w[np.arange(N), states[tr]] for tr in range(ntr)]
+    whittle_indices = tf.convert_to_tensor(whittle_indices, dtype=tf.float32)
+
+    soft_top_k_whittle = getSoftTopk(whittle_indices, k)
+    for tr in range(ntr):
+        actions[tr, soft_top_k_whittle[tr]] = 1
 
     return actions.astype('int64')
 

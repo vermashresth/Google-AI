@@ -4,7 +4,7 @@ import argparse
 import tqdm
 
 from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
-from dfl.policy import getActions
+from dfl.policy import getActions, getSoftActions
 from dfl.utils import getBenefsByCluster
 from dfl.environments import generalEnv
 
@@ -12,14 +12,13 @@ from dfl.environments import generalEnv
 
 from collections import defaultdict
 
-def simulateTrajectories(args, env, k, w, gamma, start_state=None):
+def simulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[0]):
 
     ##### Unpack arguments
     L=args['simulation_length']
     N=args['num_beneficiaries']
     ntr=args['num_trials']
 
-    policies=[0, 1, 2]
     n_policies = len(policies)
     state_record=np.zeros((ntr, n_policies, L, N))  # Store the full state
                                                     # trajectory
@@ -88,9 +87,81 @@ def simulateTrajectories(args, env, k, w, gamma, start_state=None):
   
     return simulated_rewards, state_record, action_record, reward_record, traj
 
+def fastSimulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[3]):
+    # Parallel implementation of simulation
+
+    ##### Unpack arguments
+    L=args['simulation_length']
+    N=args['num_beneficiaries']
+    ntr=args['num_trials']
+
+    n_policies = len(policies)
+    state_record=np.zeros((ntr, n_policies, L, N))  # Store the full state
+                                                    # trajectory
+    action_record=np.zeros((ntr, n_policies, L, N))  # Store the full action
+                                                    # trajectory
+    reward_record=np.zeros((ntr, n_policies, L, N))  # Store the full reward
+                                                    # trajectory
+
+    simulated_rewards=np.zeros((ntr, n_policies)) # Store aggregate rewards
+
+    traj = np.zeros((ntr, n_policies, L, len(dim_dict), N))
+    ##### Iterate over number of independent trials to average over
+    ## For current trial, evaluate all policies
+    for pol_idx, pol in enumerate(policies):
+
+        assert(pol == 3) # This only works for soft whittle
+
+        # Initialize State
+        if start_state is None:
+            states = np.concatenate([env.getStartState().reshape(1,N) for _ in range(ntr)], axis=0)
+        else:
+            # Explicitly given start_state, for debugging purposes
+            assert start_state.shape == (ntr, N,)
+            states = np.copy(start_state)
+        
+        ## Iterate over timesteps. Note that if simulation length is L, 
+        ## there are L-1 action decisions to take.
+        for timestep in range(L-1):
+
+            ## Note Current State
+            state_record[:, pol_idx, timestep, :] = np.copy(states)
+            traj[:, pol_idx, timestep, dim_dict['state'], :] = np.copy(states)
+
+            ## Get Actions
+            actions = getSoftActions(states=states, policy=pol, ts=timestep, w=w, k=k)
+            action_record[:, pol_idx, timestep, :] = np.copy(actions)
+            traj[:, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
+
+            # Non-parallelizable part
+            next_states_list = []
+            for tr, tmp_states, tmp_actions in zip(range(ntr), states, actions):
+                ## Get rewards
+                tmp_rewards = env.getRewards(tmp_states, tmp_actions)
+                reward_record[tr, pol_idx, timestep, :] = np.copy(tmp_rewards)
+            
+                ## Transition to next state and get rewards
+                tmp_next_states = env.takeActions(tmp_states, tmp_actions)
+                traj[tr, pol_idx, timestep, dim_dict['next_state'], :] = np.copy(tmp_next_states)
+
+                # rewards = np.copy(states)
+                traj[tr, pol_idx, timestep, dim_dict['reward'], :] = np.copy(tmp_rewards)
+                
+                next_states_list.append(tmp_next_states.reshape(1,-1))
+
+            next_states = np.concatenate(next_states_list, axis=0)
+            states = next_states
+
+        # Note Rewards
+        gamma_list = np.repeat(np.reshape(gamma ** np.arange(L), (1,1,L,1)), repeats=ntr, axis=0)
+        discounted_reward_record = reward_record * gamma_list
+        simulated_rewards[:, pol_idx] = np.sum(discounted_reward_record[:,pol_idx], axis=(1,2))
+    
+    return simulated_rewards, state_record, action_record, reward_record, traj
 
 def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
-                             T_data=None, R_data=None, w=None, start_state=None, H=10, debug=False, replace=False, select_full=False):
+                             T_data=None, R_data=None, w=None, start_state=None, H=10, debug=False, replace=False,
+                             select_full=False, policies=[0], fast=False):
 
     # Set args params
     args = {}
@@ -119,13 +190,16 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     assert(T_data.shape[1] == T_data.shape[3] == env.n_states) # n_states
 
     # Run simulation
-    simulated_rewards, state_record, action_record, reward_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state)
+    if fast: # This only supports policy_id = 3
+        simulated_rewards, state_record, action_record, reward_record, traj = fastSimulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state, policies=policies)
+    else:
+        simulated_rewards, state_record, action_record, reward_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state, policies=policies)
 
     if debug:
         print(mask[:10])
         print('trajectory shape: ', np.array(traj).shape) 
-    whittle_rew = simulated_rewards[:, 2].mean()
-    return traj, whittle_rew, simulated_rewards, mask, state_record, action_record, reward_record
+    # whittle_rew = simulated_rewards[:, 2].mean()
+    return traj, simulated_rewards, mask, state_record, action_record, reward_record
 
 
 
@@ -163,29 +237,22 @@ def getBenefsFullFrequency(traj, benef_ids, policy_id):
     benef_ci_traj = benef_ci_traj.reshape(-1, benef_ci_traj.shape[2], benef_ci_traj.shape[3])
     s_traj_c =  benef_ci_traj[:, :-1, dim_dict['state']]
     a_traj_c =  benef_ci_traj[:, :-1, dim_dict['action']]
+    r_traj_c =  benef_ci_traj[:, :-1, dim_dict['reward']]
     s_prime_traj_c =  benef_ci_traj[:, :-1, dim_dict['next_state']]
     a_prime_traj_c = benef_ci_traj[:, 1:, dim_dict['action']]
 
-    transitions_df = pd.DataFrame(columns = ['s', 's_prime', 'a', 'a_prime'])
+    transitions_df = pd.DataFrame(columns = ['s', 's_prime', 'r', 'a', 'a_prime'])
 
-    for s_traj, a_traj, s_prime_traj, a_prime_traj in \
-                        zip(s_traj_c, a_traj_c, s_prime_traj_c, a_prime_traj_c):
+    for s_traj, a_traj, r_traj, s_prime_traj, a_prime_traj in \
+                        zip(s_traj_c, a_traj_c, r_traj_c, s_prime_traj_c, a_prime_traj_c):
         transitions_df = transitions_df.append(pd.DataFrame({'s':s_traj,
                                 's_prime': s_prime_traj,
+                                'r': r_traj,
                                 'a': a_traj,
                                 'a_prime': a_prime_traj}), ignore_index=True)
 
     return transitions_df
     
-    n_trials = traj.shape[0]
-    transition_df_list = []
-    for trial_id in range(n_trials):
-        tmp_transition_df = getBenefsFrequency(traj, benef_ids, policy_id, trial_id)
-        transition_df_list.append(tmp_transition_df)
-    transition_df = pd.concat(transition_df_list, ignore_index=True)
-
-    return transition_df
-
 def getBenefsEmpProbs(traj, benef_ids, policy_id, trial_id, min_sup = 1, decomposed=False):
     transition_df = getBenefsFrequency(traj, benef_ids, policy_id, trial_id)
     
@@ -340,13 +407,15 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None):
 
     # Filling in empirical transition probs
     transition_prob_list = []
+    emp_R_data = np.zeros((n_benefs, n_states))
 
     for benef_id in range(n_benefs):
         transitions_df = getBenefsFullFrequency(traj, [benef_id], policy_id)
         transition_prob = default_prob.copy()
 
         for s in range(n_states):
-            # emp_prob[(s)] = {}
+            emp_R_data[benef_id,s] = np.mean(transitions_df[transitions_df['s'] == s]['r'])
+
             for a in range(n_actions):
                 s_a = transitions_df[(transitions_df['s']==s) &
                                         (transitions_df['a']==a)
@@ -362,7 +431,7 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None):
 
     emp_T_data = np.concatenate(transition_prob_list, axis=0)
 
-    return emp_T_data
+    return emp_T_data, emp_R_data
 
 
 def getEmpProbClusterLookup(traj, policy_id, trial_id, cluster_ids, decomposed):
