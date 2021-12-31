@@ -90,7 +90,7 @@ def simulateTrajectories(args, env, k, w, gamma, start_state=None):
 
 
 def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
-                             T_data=None, R_data=None, w=None, start_state=None, H=10, debug=False, replace=False):
+                             T_data=None, R_data=None, w=None, start_state=None, H=10, debug=False, replace=False, select_full=False):
 
     # Set args params
     args = {}
@@ -102,7 +102,10 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
 
     # If transitions matrix is for larger number of benefs than `n_benefs`, generate a mask
     np.random.seed(mask_seed)
-    mask = np.random.choice(np.arange(T_data.shape[0]), n_benefs, replace=replace)
+    if select_full:
+        mask = np.arange(T_data.shape[0])
+    else:
+        mask = np.random.choice(np.arange(T_data.shape[0]), n_benefs, replace=replace)
     
     # Define Simulation environment
     np.random.seed(int(seed))
@@ -124,8 +127,10 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     whittle_rew = simulated_rewards[:, 2].mean()
     return traj, whittle_rew, simulated_rewards, mask, state_record, action_record, reward_record
 
+
+
     
-def getBenefsEmpProbs(traj, benef_ids, policy_id, trial_id, min_sup = 1, decomposed=False):
+def getBenefsFrequency(traj, benef_ids, policy_id, trial_id):
     benef_ci_traj = traj[trial_id, # trial index
             policy_id, # policy index
             :, # time index
@@ -145,11 +150,49 @@ def getBenefsEmpProbs(traj, benef_ids, policy_id, trial_id, min_sup = 1, decompo
                                 's_prime': s_prime_traj,
                                 'a': a_traj,
                                 'a_prime': a_prime_traj}), ignore_index=True)
+
+    return transitions_df
+
+def getBenefsFullFrequency(traj, benef_ids, policy_id):
+    benef_ci_traj = traj[:, # trial index
+            policy_id, # policy index
+            :, # time index
+            :, # tuple dimension
+            benef_ids # benef index
+        ]
+    benef_ci_traj = benef_ci_traj.reshape(-1, benef_ci_traj.shape[2], benef_ci_traj.shape[3])
+    s_traj_c =  benef_ci_traj[:, :-1, dim_dict['state']]
+    a_traj_c =  benef_ci_traj[:, :-1, dim_dict['action']]
+    s_prime_traj_c =  benef_ci_traj[:, :-1, dim_dict['next_state']]
+    a_prime_traj_c = benef_ci_traj[:, 1:, dim_dict['action']]
+
+    transitions_df = pd.DataFrame(columns = ['s', 's_prime', 'a', 'a_prime'])
+
+    for s_traj, a_traj, s_prime_traj, a_prime_traj in \
+                        zip(s_traj_c, a_traj_c, s_prime_traj_c, a_prime_traj_c):
+        transitions_df = transitions_df.append(pd.DataFrame({'s':s_traj,
+                                's_prime': s_prime_traj,
+                                'a': a_traj,
+                                'a_prime': a_prime_traj}), ignore_index=True)
+
+    return transitions_df
+    
+    n_trials = traj.shape[0]
+    transition_df_list = []
+    for trial_id in range(n_trials):
+        tmp_transition_df = getBenefsFrequency(traj, benef_ids, policy_id, trial_id)
+        transition_df_list.append(tmp_transition_df)
+    transition_df = pd.concat(transition_df_list, ignore_index=True)
+
+    return transition_df
+
+def getBenefsEmpProbs(traj, benef_ids, policy_id, trial_id, min_sup = 1, decomposed=False):
+    transition_df = getBenefsFrequency(traj, benef_ids, policy_id, trial_id)
+    
     if decomposed:
         emp_prob, aux_dict = getEmpProbsDecomposed(transitions_df, min_sup)
     else:
         emp_prob, aux_dict = getEmpProbs(transitions_df, min_sup)
-
                         
     return transitions_df, emp_prob, aux_dict
 
@@ -263,6 +306,64 @@ def getEmpProbsDecomposed(transitions_df, min_sup = 1):
 
                         
     return new_emp_prob, {'s_a_s_prime_dict': emp_prob , 'has_missing_values': has_missing_values}
+
+def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None):
+    # This function does not prune the transitions of (s', a') that do not appear in (s, a)
+    # The output is the empirical T_data that can be directly used for simulation.
+    # This is only used for simulation but not for trajectory stitching.
+
+    n_actions = 2
+
+    # Construct default transition probs
+    if env == 'general':
+        n_states = m
+        emp_prob = np.zeros((n_states, n_actions, n_states))
+        default_prob = np.ones((n_states, n_actions, n_states)) / n_states
+    elif env == 'POMDP':
+        n_states = m * H
+        assert(H is not None)
+        emp_prob = np.zeros((n_states, n_actions, n_states))
+        default_passive_prob = np.zeros((m, H, 1, m, H))
+        default_active_prob  = np.zeros((m, H, 1, m, H))
+        for h in range(H):
+            if h < H-1:
+                default_passive_prob[np.arange(m), h, 0, np.arange(m), h+1] = 1
+            else:
+                default_passive_prob[np.arange(m), h, 0, np.arange(m), h] = 1
+
+        default_active_prob[:, :, 0, :, 0] = 1.0 / m # reset to one of the initial states
+        default_passive_prob = default_passive_prob.reshape(m*H, 1, m*H)
+        default_active_prob  = default_active_prob.reshape(m*H, 1, m*H)
+        default_prob = np.concatenate([default_passive_prob, default_active_prob], axis=1)
+    else:
+        raise NotImplementedError
+
+    # Filling in empirical transition probs
+    transition_prob_list = []
+
+    for benef_id in range(n_benefs):
+        transitions_df = getBenefsFullFrequency(traj, [benef_id], policy_id)
+        transition_prob = default_prob.copy()
+
+        for s in range(n_states):
+            # emp_prob[(s)] = {}
+            for a in range(n_actions):
+                s_a = transitions_df[(transitions_df['s']==s) &
+                                        (transitions_df['a']==a)
+                                    ]
+                s_a_count = s_a.shape[0]
+                for s_prime in range(n_states):
+                    s_a_s_prime = s_a[(s_a['s_prime']==s_prime)
+                                                ]
+                    s_a_s_prime_count = s_a_s_prime.shape[0]
+                    if s_a_count >= 1:
+                        transition_prob[s,a,s_prime] = s_a_s_prime_count / s_a_count
+        transition_prob_list.append(transition_prob.reshape(1, n_states, 2, n_states))
+
+    emp_T_data = np.concatenate(transition_prob_list, axis=0)
+
+    return emp_T_data
+
 
 def getEmpProbClusterLookup(traj, policy_id, trial_id, cluster_ids, decomposed):
     emp_prob_by_cluster = {}

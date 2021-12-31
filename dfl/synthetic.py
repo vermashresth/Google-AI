@@ -8,6 +8,7 @@ from dfl.trajectory import getSimulatedTrajectories
 from dfl.utils import generateRandomTMatrix
 from dfl.whittle import whittleIndex, newWhittleIndex
 from dfl.environments import POMDP2MDP
+from dfl.ope import opeSimulator
 
 def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env='general', H=10, run_whittle=False):
     # n_benefs: number of beneficiaries in a cohort
@@ -67,10 +68,16 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
                 state_record, action_record, reward_record = getSimulatedTrajectories(
                                                                 n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
                                                                 seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
-                                                                w=w, replace=False
+                                                                w=w, replace=False, select_full=True
                                                                 )
 
-        instance = (feature, raw_T_data, raw_R_data, traj, simulated_rewards, mask, state_record, action_record, reward_record)
+        OPE_sim_n_trials = 100
+        ope_simulator = opeSimulator(traj, mask_seed, n_benefs, L, K, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', env=env, H=H)
+
+        # print('real T data:', T_data[0])
+        # print('empirical T data:', ope_simulator.emp_T_data[0])
+
+        instance = (feature, raw_T_data, raw_R_data, traj, ope_simulator, simulated_rewards, mask, state_record, action_record, reward_record)
         print('average simulated rewards (random, rr, whittle):', np.mean(simulated_rewards, axis=0))
         dataset.append(instance)
 
@@ -90,10 +97,10 @@ if __name__ == '__main__':
     n_trials = 100
     L = 10
     K = 3
-    n_states = 3
+    n_states = 2
     gamma = 0.99
-    env = 'general'
+    env = 'POMDP'
     H = 10
 
     T_data = generateRandomTMatrix(n_benefs, n_states=n_states)
-    dataset = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma=gamma, env=env, H=H, run_whittle=True)
+    dataset = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma=gamma, env=env, H=H, run_whittle=False)

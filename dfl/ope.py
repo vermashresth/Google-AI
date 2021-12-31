@@ -6,6 +6,7 @@ from dfl.policy import getActionProb, getActionProbNaive, getProbs
 from dfl.config import dim_dict, policy_map
 from dfl.trajectory import getSimulatedTrajectories
 from dfl.trajectory import getEmpProbBenefLookup, getEmpProbClusterLookup, augmentTraj
+from dfl.trajectory import getEmpTransitionMatrix
 from dfl.utils import aux_dict_to_transition_matrix
 
 def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
@@ -149,18 +150,19 @@ def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_nam
     return ope
 
 # Simulation-based OPE (differentiable and parallelizable)
-class opeSimulation(object): # TODO
-    def __init__(self, beh_traj, mask_seed, n_benefs, T, K, OPE_sim_n_trials, gamma, beh_policy_name):
+class opeSimulator(object): # TODO
+    def __init__(self, beh_traj, mask_seed, n_benefs, T, K, m, OPE_sim_n_trials, gamma, beh_policy_name, env='general', H=None):
         self.mask_seed = mask_seed
-        self.n_benefs = n_benef
+        self.n_benefs = n_benefs
         self.T = T
         self.K = K
+        self.m = m
+        self.H = H
         self.OPE_sim_n_trials = OPE_sim_n_trials
         self.gamma = gamma
 
         policy_id = policy_map[beh_policy_name]
-        emp_prob_by_benef_ssa, tr_df_benef_ssa, aux_dict_ssa = getEmpProbBenefLookup(beh_traj, policy_id, trial_id, n_benefs, True)
-        self.est_T_data = aux_dict_to_transition_matrix(aux_dict_ssa, n_benefs)
+        self.emp_T_data = getEmpTransitionMatrix(traj=beh_traj, policy_id=policy_id, n_benefs=n_benefs, m=m, env=env, H=H)
 
     def __call__(self, w):
         compute = tf.custom_gradient(lambda x: self._compute(x))
@@ -168,10 +170,13 @@ class opeSimulation(object): # TODO
 
     def _compute(self, w):
         traj, OPE_sim_whittle, simulated_rewards, mask, state_record, action_record, reward_record = getSimulatedTrajectories(
-                                                    self.n_benefs, self.T, self.K, self.OPE_sim_n_trials, gamma,
-                                                    sim_seed, mask_seed, self.est_T_data, w
+                                                    n_benefs=self.n_benefs, T=self.T, K=self.K, n_trials=self.OPE_sim_n_trials, gamma=gamma,
+                                                    mask_seed=mask_seed, T_data=self.emp_T_data, w=w, select_full=True
                                                     )
 
         def gradient_function(dsoln):
             return grad_w
 
+        average_reward = tf.reduce_mean(simulated_rewards)
+
+        return tf.stop_gradient(average_reward), gradient_function

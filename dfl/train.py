@@ -55,7 +55,7 @@ if __name__ == '__main__':
         for mode, dataset in dataset_list:
             loss_list = []
             ope_list = []
-            for (feature, label, raw_R_data, traj, simulated_rewards, mask, state_record, action_record, reward_record) in tqdm.tqdm(dataset):
+            for (feature, label, raw_R_data, traj, ope_simulator, simulated_rewards, mask, state_record, action_record, reward_record) in tqdm.tqdm(dataset):
                 feature, label = tf.constant(feature, dtype=tf.float32), tf.constant(label, dtype=tf.float32)
                 raw_R_data = tf.constant(raw_R_data, dtype=tf.float32)
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                     # ============ Parallel version of OPE implementation =============
                     opeIS_decomposed_parallel = opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, L, K, n_trials, gamma,
                             target_policy_name, beh_policy_name)
-                    # print('opeIS (parallel)', opeIS_decomposed_parallel)
+                    # ope_simuation = ope_simulator()
 
                     performance = -opeIS_decomposed_parallel
 
