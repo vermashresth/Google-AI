@@ -77,11 +77,11 @@ if __name__ == '__main__':
                     w = newWhittleIndex(T_data, R_data)
                     
                     # ============ Parallel version of OPE implementation =============
-                    # ope = opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, L, K, n_trials, gamma,
-                    #         target_policy_name, beh_policy_name)
+                    ope = opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, L, K, n_trials, gamma,
+                            target_policy_name, beh_policy_name)
 
                     # ============ Simulation-based OPE ===============================
-                    ope = ope_simulator(w)
+                    # ope = ope_simulator(w)
 
                     performance = -ope
 
