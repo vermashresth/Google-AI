@@ -17,6 +17,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ARMMAN decision-focused learning')
     parser.add_argument('--method', default='TS', type=str, help='TS (two-stage learning) or DF (decision-focused learning).')
     parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
+    parser.add_argument('--ope', default='IS', type=str, help='importance sampling (IS) or simulation-based (sim).')
 
     args = parser.parse_args()
     print('argparser arguments', args)
@@ -34,6 +35,9 @@ if __name__ == '__main__':
     # Environment setup
     env = args.env
     H = 10
+
+    # Evaluation setup
+    ope_mode = args.ope
 
     # dataset generation
     full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H)
@@ -76,12 +80,13 @@ if __name__ == '__main__':
                     # w = whittleIndex(prediction)
                     w = newWhittleIndex(T_data, R_data)
                     
-                    # ============ Parallel version of OPE implementation =============
-                    ope = opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, L, K, n_trials, gamma,
-                            target_policy_name, beh_policy_name)
-
-                    # ============ Simulation-based OPE ===============================
-                    # ope = ope_simulator(w)
+                    if ope_mode == 'IS': # importance-sampling based OPE
+                        ope = opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, L, K, n_trials, gamma,
+                                target_policy_name, beh_policy_name)
+                    elif ope_mode == 'sim': # simulation-based OPE
+                        ope = ope_simulator(w)
+                    else:
+                        raise NotImplementedError
 
                     performance = -ope
 
