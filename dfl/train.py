@@ -21,6 +21,7 @@ if __name__ == '__main__':
     parser.add_argument('--sv', default='.', type=str, help='save string name')
     parser.add_argument('--epochs', default=10, type=int, help='num epochs')
     parser.add_argument('--ope', default='IS', type=str, help='importance sampling (IS) or simulation-based (sim).')
+    parser.add_argument('--seed', default=0, type=int, help='random seed for synthetic data generation.')
 
     args = parser.parse_args()
     print('argparser arguments', args)
@@ -38,12 +39,13 @@ if __name__ == '__main__':
     # Environment setup
     env = args.env
     H = 10
+    seed = args.seed
 
     # Evaluation setup
     ope_mode = args.ope
 
     # dataset generation
-    full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H)
+    full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H, seed=seed)
     train_dataset = full_dataset[:int(n_instances*0.7)]
     val_dataset   = full_dataset[int(n_instances*0.7):int(n_instances*0.8)]
     test_dataset  = full_dataset[int(n_instances*0.8):]
@@ -70,7 +72,7 @@ if __name__ == '__main__':
             if mode == 'train':
                 dataset = tqdm.tqdm(dataset)
 
-            for (feature, label, raw_R_data, traj, ope_simulator, simulated_rewards, mask, state_record, action_record, reward_record) in dataset:
+            for (feature, label, raw_R_data, traj, ope_simulator, simulated_rewards, state_record, action_record, reward_record) in dataset:
                 feature, label = tf.constant(feature, dtype=tf.float32), tf.constant(label, dtype=tf.float32)
                 raw_R_data = tf.constant(raw_R_data, dtype=tf.float32)
 
@@ -93,7 +95,7 @@ if __name__ == '__main__':
                     w = newWhittleIndex(T_data, R_data)
                     
                     if ope_mode == 'IS': # importance-sampling based OPE
-                        ope = opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, L, K, n_trials, gamma,
+                        ope = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
                                 target_policy_name, beh_policy_name)
                     elif ope_mode == 'sim': # simulation-based OPE
                         ope = ope_simulator(w)

@@ -34,9 +34,6 @@ def simulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[0])
     ##### Iterate over number of independent trials to average over
     for tr in range(ntr):
 
-        ## Initialize Random State for each trial
-        np.random.seed(seed=tr+args['seed_base'])
-        
         ## For current trial, evaluate all policies
         for pol_idx, pol in enumerate(policies):
 
@@ -159,9 +156,9 @@ def fastSimulateTrajectories(args, env, k, w, gamma, start_state=None, policies=
     
     return simulated_rewards, state_record, action_record, reward_record, traj
 
-def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, seed = 10, mask_seed=10,
+def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1,
                              T_data=None, R_data=None, w=None, start_state=None, H=10, debug=False, replace=False,
-                             select_full=False, policies=[0], fast=False):
+                             policies=[0], fast=False):
 
     # Set args params
     args = {}
@@ -169,37 +166,30 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
     args['num_resources']=K
     args['simulation_length']=T
     args['num_trials']=n_trials
-    args['seed_base'] = seed
 
     # If transitions matrix is for larger number of benefs than `n_benefs`, generate a mask
-    np.random.seed(mask_seed)
-    if select_full:
-        mask = np.arange(T_data.shape[0])
-    else:
-        mask = np.random.choice(np.arange(T_data.shape[0]), n_benefs, replace=replace)
-    
-    # Define Simulation environment
-    np.random.seed(int(seed))
+    # Updated: I prefer to sample the mask outside of the simulation.
+    # So the size of the transition matric needs to match `n_benefs`.
+    assert(n_benefs == len(T_data) == len(R_data))
 
+    # Define Simulation environment
     # Generate environment
     env = generalEnv(N=n_benefs,
-                    T_data=T_data[mask], R_data=R_data[mask],
-                    seed = seed)
+                    T_data=T_data, R_data=R_data)
     
     assert(T_data.shape[2] == 2) # 2 actions
     assert(T_data.shape[1] == T_data.shape[3] == env.n_states) # n_states
 
     # Run simulation
     if fast: # This only supports policy_id = 3
-        simulated_rewards, state_record, action_record, reward_record, traj = fastSimulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state, policies=policies)
+        simulated_rewards, state_record, action_record, reward_record, traj = fastSimulateTrajectories(args=args, env=env, k=K, w=w, gamma=gamma, start_state=start_state, policies=policies)
     else:
-        simulated_rewards, state_record, action_record, reward_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w[mask], gamma=gamma, start_state=start_state, policies=policies)
+        simulated_rewards, state_record, action_record, reward_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w, gamma=gamma, start_state=start_state, policies=policies)
 
     if debug:
-        print(mask[:10])
         print('trajectory shape: ', np.array(traj).shape) 
     # whittle_rew = simulated_rewards[:, 2].mean()
-    return traj, simulated_rewards, mask, state_record, action_record, reward_record
+    return traj, simulated_rewards, state_record, action_record, reward_record
 
 
 

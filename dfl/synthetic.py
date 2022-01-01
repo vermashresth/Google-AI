@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import random
 import time
 import sys
 sys.path.insert(0, '../')
@@ -11,7 +12,7 @@ from dfl.whittle import whittleIndex, newWhittleIndex
 from dfl.environments import POMDP2MDP
 from dfl.ope import opeSimulator
 
-def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env='general', H=10, run_whittle=False):
+def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env='general', H=10, run_whittle=False, seed=0):
     # n_benefs: number of beneficiaries in a cohort
     # n_states: number of states
     # n_instances: number of cohorts in the whole dataset
@@ -19,6 +20,11 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
     # L: number of time steps
     # K: budget
     # gamma: discount factor
+
+    # Set up random seed
+    np.random.seed(seed)
+    random.seed(seed)
+    tf.random.set_seed(seed)
 
     # Generate T_data => ANN => features
     # Return a tensorflow dataset that includes (features, traj, T_data) as an instance.
@@ -63,25 +69,20 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
         
         assert w.shape == (n_benefs, T_data.shape[1])
 
-        sim_seed = i  # just a randomness
-        mask_seed = i # just a randomness
-        
         # start_time = time.time()
-        traj, simulated_rewards, mask, \
-                state_record, action_record, reward_record = getSimulatedTrajectories(
+        traj, simulated_rewards, state_record, action_record, reward_record = getSimulatedTrajectories(
                                                                 n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
-                                                                seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
-                                                                w=w, replace=False, select_full=True, policies=[0,1,2]
+                                                                T_data=T_data, R_data=R_data,
+                                                                w=w, replace=False, policies=[0,1,2]
                                                                 )
         # print('slow version', time.time() - start_time)
 
         # # The fast version is only implemented for policy_id = 3
         # start_time = time.time()
-        # traj, simulated_rewards, mask, \
-        #         state_record, action_record, reward_record = getSimulatedTrajectories(
+        # traj, simulated_rewards, state_record, action_record, reward_record = getSimulatedTrajectories(
         #                                                         n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
-        #                                                         seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
-        #                                                         w=w, replace=False, select_full=True, policies=[3], fast=True
+        #                                                         seed=sim_seed, T_data=T_data, R_data=R_data,
+        #                                                         w=w, replace=False, policies=[3], fast=True
         #                                                         )
         # print('fast version', time.time() - start_time)
 
@@ -90,13 +91,13 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
         # This part takes the longest preprocessing time.
         # start_time = time.time()
         OPE_sim_n_trials = 100
-        ope_simulator = opeSimulator(traj, mask_seed, n_benefs, L, K, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', env=env, H=H)
+        ope_simulator = opeSimulator(traj, n_benefs, L, K, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', env=env, H=H)
         # print('Initializing simulator time', time.time() - start_time)
 
         # print('real T data:', T_data[0])
         # print('empirical T data:', ope_simulator.emp_T_data[0])
 
-        instance = (feature, raw_T_data, raw_R_data, traj, ope_simulator, simulated_rewards, mask, state_record, action_record, reward_record)
+        instance = (feature, raw_T_data, raw_R_data, traj, ope_simulator, simulated_rewards, state_record, action_record, reward_record)
         print('average simulated rewards (random, rr, whittle, soft-whittle):', np.mean(simulated_rewards, axis=0))
         dataset.append(instance)
 

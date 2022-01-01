@@ -9,7 +9,7 @@ from dfl.trajectory import getEmpProbBenefLookup, getEmpProbClusterLookup, augme
 from dfl.trajectory import getEmpTransitionMatrix
 from dfl.utils import aux_dict_to_transition_matrix
 
-def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
+def opeIS(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
     compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}
     gamma_series = np.array([gamma**t for t in range(T-1)]) # Kai edited: it was **t-1** instead of **t**.
 
@@ -17,7 +17,7 @@ def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, be
     target_probs = np.zeros((n_trials, T, n_benefs))
 
     v = []
-    w_mask = tf.gather(w, mask) if tf.is_tensor(w) else w[mask] # Added the tensorflow version to support tensorflow indexing
+    # w_mask = tf.gather(w, mask) if tf.is_tensor(w) else w[mask] # Added the tensorflow version to support tensorflow indexing
     for benef in tqdm.tqdm(range(n_benefs), desc='OPE'):
         v_i = 0
         for trial in range(n_trials):
@@ -40,11 +40,11 @@ def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, be
                 pi_tar = getActionProb(s_t, a_i_t,
                                            policy=compare['target'],
                                            benef=benef, ts=ts,
-                                           w=w_mask, k=K, N=n_benefs)
+                                           w=w, k=K, N=n_benefs)
                 pi_beh = getActionProb(s_t, a_i_t,
                                            policy=compare['beh'],
                                            benef=benef, ts=ts,
-                                           w=w_mask, k=K, N=n_benefs)
+                                           w=w, k=K, N=n_benefs)
                 imp_weight*= pi_tar/pi_beh
                 # if imp_weight>1:
                 #     print('weight: ', imp_weight)
@@ -66,14 +66,14 @@ def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, be
     return ope
 
 #This is the parallelized implementation of the same OPE. Ideally these two should match but the parallelized version is faster.
-def opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
+def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
     compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}
     gamma_series = np.array([gamma**t for t in range(T-1)])
 
     ntr, _, L, N = state_record.shape
 
     v = []
-    w_mask = tf.gather(w, mask) if tf.is_tensor(w) else w[mask] # Added the tensorflow version to support tensorflow indexing
+    # w_mask = tf.gather(w, mask) if tf.is_tensor(w) else w[mask] # Added the tensorflow version to support tensorflow indexing
 
     # state_record_beh = np.concatenate([np.tile(np.arange(N), (ntr, L, 1)).reshape(ntr, L, N, 1), state_record[:,compare['beh'],:,:].reshape(ntr, L, N, 1)], axis=-1).astype(int)
     action_record_beh = action_record[:,0,:,:]
@@ -82,8 +82,8 @@ def opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs
     # whittle_indices = tf.gather_nd(w, state_record_beh)
 
     # Batch topk to get probabilities
-    beh_probs_raw    = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, N), policy=compare['beh'], ts=None, w=w_mask, k=K),    (ntr, L, N))
-    target_probs_raw = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, N), policy=compare['target'], ts=None, w=w_mask, k=K), (ntr, L, N))
+    beh_probs_raw    = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, N), policy=compare['beh'], ts=None, w=w, k=K),    (ntr, L, N))
+    target_probs_raw = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, N), policy=compare['target'], ts=None, w=w, k=K), (ntr, L, N))
 
     # Use action to select the corresponding probabilities
     beh_probs    = beh_probs_raw * action_record_beh + (1 - beh_probs_raw) * (1 - action_record_beh)
@@ -103,7 +103,7 @@ def opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs
     ope = tf.reduce_sum(ope) / ntr
     return ope
 
-def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
+def opeISNaive(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
     compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}
     gamma_series = np.array([gamma**(t-1) for t in range(T-1)])
 
@@ -129,9 +129,9 @@ def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_nam
             # s_t_encoded = encode_vector(s_t, N_STATES)
 
             pi_tar = getActionProbNaive(s_t, a_t, policy=compare['target'],
-                                        w=w[mask], k=K, N=n_benefs)
+                                        w=w, k=K, N=n_benefs)
             pi_beh = getActionProbNaive(s_t, a_t, policy=compare['beh'],
-                                        w=w[mask], k=K, N=n_benefs)
+                                        w=w, k=K, N=n_benefs)
 
             imp_weight*= pi_tar/pi_beh
             # if imp_weight>1:
@@ -150,9 +150,8 @@ def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_nam
     return ope
 
 # Simulation-based OPE (differentiable and parallelizable)
-class opeSimulator(object): # TODO
-    def __init__(self, beh_traj, mask_seed, n_benefs, T, K, m, OPE_sim_n_trials, gamma, beh_policy_name, env='general', H=None):
-        self.mask_seed = mask_seed
+class opeSimulator(object):
+    def __init__(self, beh_traj, n_benefs, T, K, m, OPE_sim_n_trials, gamma, beh_policy_name, env='general', H=None):
         self.n_benefs = n_benefs
         self.T = T
         self.K = K
@@ -170,9 +169,9 @@ class opeSimulator(object): # TODO
 
     def _compute(self, w):
         # Fast soft Whittle simulation
-        traj, simulated_rewards, mask, state_record, action_record, reward_record = getSimulatedTrajectories(
+        traj, simulated_rewards, state_record, action_record, reward_record = getSimulatedTrajectories(
                                                     n_benefs=self.n_benefs, T=self.T, K=self.K, n_trials=self.OPE_sim_n_trials, gamma=self.gamma,
-                                                    mask_seed=self.mask_seed, T_data=self.emp_T_data, R_data=self.emp_R_data,
+                                                    T_data=self.emp_T_data, R_data=self.emp_R_data,
                                                     w=w.numpy(), select_full=True, policies=[3], fast=True
                                                     )
         

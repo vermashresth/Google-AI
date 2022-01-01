@@ -6,13 +6,12 @@ from armman.simulator import getTopk
 EPS = 1e-6
 
 class baseEnv:
-    def __init__(self, N, T_data, R_data, n_states, n_actions, seed):
+    def __init__(self, N, T_data, R_data, n_states, n_actions):
         self.N = N
         self.T_data = T_data
         self.R_data = R_data
         self.n_states = n_states
         self.n_actions = n_actions
-        np.random.seed(seed)
         self.check_shapes()
 
     def check_shapes(self):
@@ -39,21 +38,21 @@ class baseEnv:
         return np.random.multinomial(1, [1/self.n_states]*self.n_states, self.N).argmax(axis=1)
 
 # class armmanEnv(baseEnv):
-#     def __init__(self, N, T_data, R_data, seed):
+#     def __init__(self, N, T_data, R_data):
 #         
 #         # Review: Remember, in OPE sticthed, we use n_states from global config
 #         n_states = 2
 #         n_actions = 2
-#         super().__init__(N, T_data, R_data, n_states, n_actions, seed)
+#         super().__init__(N, T_data, R_data, n_states, n_actions)
     
 class generalEnv(baseEnv):
-    def __init__(self, N, T_data, R_data, seed):
+    def __init__(self, N, T_data, R_data):
         
         # Figure out n_states and n_actions from T_data
         n_states = T_data.shape[1]
         n_actions = T_data.shape[2]
 
-        super().__init__(N, T_data, R_data, n_states, n_actions, seed)
+        super().__init__(N, T_data, R_data, n_states, n_actions)
     
 def POMDP2MDP(T_data, R_data, H):
     # This function converts the POMDP transition probabilities and rewards to MDP.
