@@ -25,14 +25,14 @@ def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, be
             v_i_tau = 0
             for ts in range(T-1):
                 a_i_t = traj[trial, # trial index
-                                compare['beh'], # policy index
+                                0, # policy index
                                 ts, # time index
                                 dim_dict['action'], # tuple dimension
                                 benef # benef index
                                 ].astype(int)
 
                 s_t = traj[trial, # trial index
-                                compare['beh'], # policy index
+                                0, # policy index
                                 ts, # time index
                                 dim_dict['state'], # tuple dimension
                                 : # benef index
@@ -49,7 +49,7 @@ def opeIS(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_name, be
                 # if imp_weight>1:
                 #     print('weight: ', imp_weight)
                 v_i_t_tau = gamma_series[ts] * traj[trial, # trial index
-                                                compare['beh'], # policy index
+                                                0, # policy index
                                                 ts, # time index
                                                 dim_dict['reward'], # tuple dimension
                                                 benef # benef index
@@ -76,14 +76,14 @@ def opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs
     w_mask = tf.gather(w, mask) if tf.is_tensor(w) else w[mask] # Added the tensorflow version to support tensorflow indexing
 
     # state_record_beh = np.concatenate([np.tile(np.arange(N), (ntr, L, 1)).reshape(ntr, L, N, 1), state_record[:,compare['beh'],:,:].reshape(ntr, L, N, 1)], axis=-1).astype(int)
-    action_record_beh = action_record[:,compare['beh'],:,:]
+    action_record_beh = action_record[:,0,:,:]
 
     # Get the corresponding Whittle indices
     # whittle_indices = tf.gather_nd(w, state_record_beh)
 
     # Batch topk to get probabilities
-    beh_probs_raw    = tf.reshape(getProbs(state_record[:,compare['beh'],:,:].reshape(-1, N), policy=compare['beh'], ts=None, w=w_mask, k=K),    (ntr, L, N))
-    target_probs_raw = tf.reshape(getProbs(state_record[:,compare['beh'],:,:].reshape(-1, N), policy=compare['target'], ts=None, w=w_mask, k=K), (ntr, L, N))
+    beh_probs_raw    = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, N), policy=compare['beh'], ts=None, w=w_mask, k=K),    (ntr, L, N))
+    target_probs_raw = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, N), policy=compare['target'], ts=None, w=w_mask, k=K), (ntr, L, N))
 
     # Use action to select the corresponding probabilities
     beh_probs    = beh_probs_raw * action_record_beh + (1 - beh_probs_raw) * (1 - action_record_beh)
@@ -96,7 +96,7 @@ def opeIS_parallel(state_record, action_record, reward_record, w, mask, n_benefs
     total_probs = np.ones((ntr, N))
     ope = 0
     for t in range(T-1):
-        rewards = reward_record[:, compare['beh'], t, :] # state_record[:,compare['beh'],t,:] # current state
+        rewards = reward_record[:, 0, t, :] 
         total_probs = total_probs * IS_weights[:,t,:]
         ope += rewards * total_probs * gamma_series[t]
 
@@ -113,7 +113,7 @@ def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_nam
         v_tau = 0
         for ts in range(T-1):
             a_t = traj[trial, # trial index
-                            compare['beh'], # policy index
+                            0, # policy index
                             ts, # time index
                             dim_dict['action'], # tuple dimension
                             : # benef index
@@ -121,7 +121,7 @@ def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_nam
             # a_t_encoded = encode_vector(a_t, N_ACTIONS)
 
             s_t = traj[trial, # trial index
-                            compare['beh'], # policy index
+                            0, # policy index
                             ts, # time index
                             dim_dict['state'], # tuple dimension
                             : # benef index
@@ -137,7 +137,7 @@ def opeISNaive(traj, w, mask, n_benefs, T, K, n_trials, gamma, target_policy_nam
             # if imp_weight>1:
             #     print('weight: ', imp_weight)
             v_t_tau = gamma_series[ts] * traj[trial, # trial index
-                                            compare['beh'], # policy index
+                                            0, # policy index
                                             ts, # time index
                                             dim_dict['reward'], # tuple dimension
                                             : # benef index
@@ -162,21 +162,33 @@ class opeSimulator(object): # TODO
         self.gamma = gamma
 
         policy_id = policy_map[beh_policy_name]
-        self.emp_T_data = getEmpTransitionMatrix(traj=beh_traj, policy_id=policy_id, n_benefs=n_benefs, m=m, env=env, H=H)
+        self.emp_T_data, self.emp_R_data = getEmpTransitionMatrix(traj=beh_traj, policy_id=policy_id, n_benefs=n_benefs, m=m, env=env, H=H)
 
     def __call__(self, w):
         compute = tf.custom_gradient(lambda x: self._compute(x))
         return compute(w)
 
     def _compute(self, w):
-        traj, OPE_sim_whittle, simulated_rewards, mask, state_record, action_record, reward_record = getSimulatedTrajectories(
-                                                    n_benefs=self.n_benefs, T=self.T, K=self.K, n_trials=self.OPE_sim_n_trials, gamma=gamma,
-                                                    mask_seed=mask_seed, T_data=self.emp_T_data, w=w, select_full=True
+        # Fast soft Whittle simulation
+        traj, simulated_rewards, mask, state_record, action_record, reward_record = getSimulatedTrajectories(
+                                                    n_benefs=self.n_benefs, T=self.T, K=self.K, n_trials=self.OPE_sim_n_trials, gamma=self.gamma,
+                                                    mask_seed=self.mask_seed, T_data=self.emp_T_data, R_data=self.emp_R_data,
+                                                    w=w.numpy(), select_full=True, policies=[3], fast=True
                                                     )
+        
+        average_reward = tf.reduce_mean(tf.convert_to_tensor(simulated_rewards, dtype=tf.float32))
 
         def gradient_function(dsoln):
-            return grad_w
+            cumulative_rewards = tf.math.cumsum(tf.convert_to_tensor(reward_record, dtype=tf.float32), axis=2)
+            with tf.GradientTape() as tmp_tape:
+                tmp_tape.watch(w)
+                selected_probs = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K), (-1, 1, self.T, self.n_benefs))
+                selected_logprobs = tf.math.log(selected_probs)
+                
+                total_reward = tf.reduce_mean(tf.reduce_sum(cumulative_rewards * selected_logprobs, axis=(2,3)))
 
-        average_reward = tf.reduce_mean(simulated_rewards)
+            dtotal_dw = tmp_tape.gradient(total_reward, w)
+
+            return dtotal_dw * dsoln
 
         return tf.stop_gradient(average_reward), gradient_function

@@ -214,7 +214,7 @@ def getSoftTopk(a, k):
     bs, n = a.shape
     diffTopK = DiffTopK(k=k)
     gamma = diffTopK(-a)
-    probs = gamma[:,:,0].numpy() * n
+    probs = gamma[:,:,0].numpy() * n / k
 
     selection = []
     for i in range(bs):

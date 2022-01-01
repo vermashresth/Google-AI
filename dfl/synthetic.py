@@ -1,5 +1,6 @@
 import tensorflow as tf
 import numpy as np
+import time
 import sys
 sys.path.insert(0, '../')
 
@@ -64,21 +65,39 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
 
         sim_seed = i  # just a randomness
         mask_seed = i # just a randomness
-        traj, sim_whittle, simulated_rewards, mask, \
+        
+        # start_time = time.time()
+        traj, simulated_rewards, mask, \
                 state_record, action_record, reward_record = getSimulatedTrajectories(
                                                                 n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
                                                                 seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
-                                                                w=w, replace=False, select_full=True
+                                                                w=w, replace=False, select_full=True, policies=[0,1,2]
                                                                 )
+        # print('slow version', time.time() - start_time)
 
+        # # The fast version is only implemented for policy_id = 3
+        # start_time = time.time()
+        # traj, simulated_rewards, mask, \
+        #         state_record, action_record, reward_record = getSimulatedTrajectories(
+        #                                                         n_benefs=n_benefs, T=L, K=K, n_trials=n_trials, gamma=gamma,
+        #                                                         seed=sim_seed, mask_seed=mask_seed, T_data=T_data, R_data=R_data,
+        #                                                         w=w, replace=False, select_full=True, policies=[3], fast=True
+        #                                                         )
+        # print('fast version', time.time() - start_time)
+
+
+        # Initialize simulation-based ope
+        # This part takes the longest preprocessing time.
+        # start_time = time.time()
         OPE_sim_n_trials = 100
         ope_simulator = opeSimulator(traj, mask_seed, n_benefs, L, K, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', env=env, H=H)
+        # print('Initializing simulator time', time.time() - start_time)
 
         # print('real T data:', T_data[0])
         # print('empirical T data:', ope_simulator.emp_T_data[0])
 
         instance = (feature, raw_T_data, raw_R_data, traj, ope_simulator, simulated_rewards, mask, state_record, action_record, reward_record)
-        print('average simulated rewards (random, rr, whittle):', np.mean(simulated_rewards, axis=0))
+        print('average simulated rewards (random, rr, whittle, soft-whittle):', np.mean(simulated_rewards, axis=0))
         dataset.append(instance)
 
     return dataset
@@ -97,7 +116,7 @@ if __name__ == '__main__':
     n_trials = 100
     L = 10
     K = 3
-    n_states = 2
+    n_states = 3
     gamma = 0.99
     env = 'POMDP'
     H = 10
