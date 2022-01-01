@@ -103,7 +103,7 @@ if __name__ == '__main__':
                     performance = -ope
 
                 # backpropagation
-                if mode == 'train' and epoch<total_epoch:
+                if mode == 'train' and epoch<total_epoch and epoch>0:
                     if training_mode == 'two-stage':
                         grad = tape.gradient(loss, model.trainable_variables)
                     elif training_mode == 'decision-focused':
