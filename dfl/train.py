@@ -4,6 +4,7 @@ import argparse
 import tqdm
 import time
 import sys
+import pickle
 sys.path.insert(0, "../")
 
 from dfl.model import ANN
@@ -17,7 +18,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ARMMAN decision-focused learning')
     parser.add_argument('--method', default='TS', type=str, help='TS (two-stage learning) or DF (decision-focused learning).')
     parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
-
+    parser.add_argument('--sv', default='.', type=str, help='save string name')
+    parser.add_argument('--epochs', default=10, type=int, help='num epochs')
     args = parser.parse_args()
     print('argparser arguments', args)
 
@@ -50,9 +52,14 @@ if __name__ == '__main__':
 
     # training
     training_mode = 'two-stage' if args.method == 'TS' else 'decision-focused'
-    total_epoch = 10
-    for epoch in range(total_epoch):
+    total_epoch = args.epochs
+    overall_loss={}
+    overall_ope={}
+    for epoch in range(total_epoch+1):
         for mode, dataset in dataset_list:
+            if epoch==0:
+                overall_loss[mode]=[]
+                overall_ope[mode]=[]
             loss_list = []
             ope_list = []
             for (feature, label, raw_R_data, traj, ope_simulator, simulated_rewards, mask, state_record, action_record, reward_record) in tqdm.tqdm(dataset):
@@ -61,7 +68,11 @@ if __name__ == '__main__':
 
                 with tf.GradientTape() as tape:
                     prediction = model(feature) # Transition probabilities
+                    if epoch==total_epoch:
+                        prediction=label
+                    
                     loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
+                    
 
                     # Setup MDP or POMDP environment
                     if env=='general':
@@ -88,7 +99,7 @@ if __name__ == '__main__':
                     performance = -opeIS_decomposed_parallel
 
                 # backpropagation
-                if mode == 'train':
+                if mode == 'train' and epoch<total_epoch:
                     if training_mode == 'two-stage':
                         grad = tape.gradient(loss, model.trainable_variables)
                     elif training_mode == 'decision-focused':
@@ -102,4 +113,13 @@ if __name__ == '__main__':
                 ope_list.append(opeIS_decomposed_parallel)
 
             print(f'Epoch {epoch}, {mode} mode, average loss {np.mean(loss_list)}, average ope {np.mean(ope_list)}')
+            
+            overall_loss[mode].append(np.mean(loss_list))
+            overall_ope[mode].append(np.mean(ope_list))
+
+    
+    if not(args.sv == '.'):
+        ### Output to be saved, else do nothing. 
+        with open(args.sv, 'wb') as filename:
+            pickle.dump([overall_loss, overall_ope], filename)
 
