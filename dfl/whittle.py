@@ -41,60 +41,77 @@ def newWhittleIndex(P, R, gamma=0.99):
     #         This part should always disable tracking gradient of P and R by using "tf.stop_gradient(P)"
     n_actions = 2
     N, n_states = P.shape[0], P.shape[1]
+
+    # Just for clarity, add another variable n_wh_states which represents 
+    # the states for which we want to calculate whittle indices. It is same as n_states
+    n_wh_states = n_states
+
     tmp_P, tmp_R = tf.stop_gradient(P), tf.stop_gradient(R)
 
+    tmp_P = tmp_P.numpy().reshape(1, N, n_states, n_actions, n_states).repeat(n_wh_states, axis=0)
+
     # initialize upper and lower bounds for binary search
-    w_ub = np.ones((N, n_states))  # Whittle index upper bound
-    w_lb = -np.ones((N, n_states)) # Whittle index lower bound
+    w_ub = np.ones((n_wh_states, N))  # Whittle index upper bound
+    w_lb = -np.ones((n_wh_states, N)) # Whittle index lower bound
     w = (w_ub + w_lb) / 2
 
     n_binary_search_iters = 30 # Using a fixed # of iterations or a tolerance rate instead
-    n_value_iters = 100
+    n_value_iters = 1000
     
     # list to store whittle indices outputted from solving linear equations
     w_list = []
 
     # Run binary search for finding whittle index corresponding to each state
-    for wh_state in range(n_states):
-        for _ in range(n_binary_search_iters):
-            w[:, wh_state] = (w_ub[:, wh_state] + w_lb[:, wh_state]) / 2
+    
+    for _ in range(n_binary_search_iters):
+        w = (w_ub + w_lb) / 2
 
-            # initialize value function
-            V = np.zeros((N, n_states))
-            for _ in range(n_value_iters): # value iteration to update V
+        # initialize value function
+        V = np.zeros((n_wh_states, N, n_states))
+        for _ in range(n_value_iters): # value iteration to update V
 
-                # V is originally of shape N x n_states
-                # repeat V to make it of same shape as tmp_P, i.e., N x n_states x n_actions x n_states
-                V_mat = V.reshape((N, 1, 1, n_states)).repeat(n_states, axis=1).repeat(n_actions, axis=2)
-                
-                # tmp_R is originally of shape N x n_states
-                # repeat reward matrix to make it of same shape as tmp_P
-                rewards_mat = tmp_R.numpy().reshape((N, n_states, 1, 1)).repeat(n_states, axis=3).repeat(n_actions, axis=2)
-
-                # w is originally of shape N x n_states
-                # repeat w to make it of shape N x n_states x n_states to be added to passive action in reward_mat
-                w_mat = w[:, wh_state].reshape((N, 1, 1)).repeat(n_states, axis=1).repeat(n_states, axis=2)
-
-                # Add subsidy to passive action
-                rewards_mat[:, :, 0, :]  = rewards_mat[:, :, 0, :] + w_mat 
-
-                # Compute discounted future rew
-                out_mat = tmp_P * (rewards_mat + gamma*V_mat)
-                Q = np.sum(out_mat, axis=3) # Q is aggregated over new_state
-                V = np.max(Q, axis=2) # Find V as max over actions
-
-            # Compute an indicator vector to mark if Whittle index is too large or too small
-            # comparison = (value of not call > value of call) # a vector of size N to indicate if w is too large or not
-            comparison = (Q[:, wh_state, 0] > Q[:, wh_state, 1]).astype(int)
+            # V is originally of shape N x n_states
+            # repeat V to make it of same shape as tmp_P, i.e., N x n_states x n_actions x n_states
+            V_mat = V.reshape((n_wh_states, N, 1, 1, n_states)).repeat(n_states, axis=2).repeat(n_actions, axis=3)
             
-            # TODO: Might want to update whittle indices for only those (arms, states) having abs(q_diff) more than a Q_delta  
-            # Update lower and upper bounds of whittle index binary search
-            w_ub[:, wh_state] = w_ub[:, wh_state] - (w_ub[:, wh_state] - w_lb[:, wh_state]) / 2 * comparison
-            w_lb[:, wh_state] = w_lb[:, wh_state] + (w_ub[:, wh_state] - w_lb[:, wh_state]) / 2 * (1 - comparison)
+            # tmp_R is originally of shape N x n_states
+            # repeat reward matrix to make it of same shape as tmp_P
+            rewards_mat = tmp_R.numpy().reshape((1, N, n_states, 1, 1)).repeat(n_wh_states, axis=0).repeat(n_actions, axis=3).repeat(n_states, axis=4)
+            # ol_rew_mat = rewards_mat.copy()
+            # w is originally of shape n_states x N
+            # repeat w to make it of shape n_states x N x n_states x n_states to be added to passive action in reward_mat
+            w_mat = w.reshape((n_wh_states, N, 1, 1)).repeat(n_states, axis=2).repeat(n_states, axis=3)
 
+            # Add subsidy to passive action
+            rewards_mat[:, :, :, 0, :]  = rewards_mat[:, :, :, 0, :] + w_mat 
+
+            # Compute discounted future rew
+            out_mat = tmp_P * (rewards_mat + gamma*V_mat)
+            Q = np.sum(out_mat, axis=4) # Q is aggregated over new_state
+            V = np.max(Q, axis=3) # Find V as max over actions
+
+        # Compute an indicator vector to mark if Whittle index is too large or too small
+        # comparison = (value of not call > value of call) # a vector of size N to indicate if w is too large or not
+        passive_q_vals = Q[..., 0]
+        active_q_vals = Q[..., 1]
+        # Return comparision of shape n_states x N
+        comparison = passive_q_vals[np.arange(n_wh_states).reshape(-1, 1).repeat(N, axis=1),
+                                    np.arange(N).reshape(1, -1).repeat(n_wh_states, axis=0),
+                                    np.arange(n_wh_states).reshape(-1, 1).repeat(N, axis=1)] > \
+                     active_q_vals[np.arange(n_wh_states).reshape(-1, 1).repeat(N, axis=1),
+                                    np.arange(N).reshape(1, -1).repeat(n_wh_states, axis=0),
+                                    np.arange(n_wh_states).reshape(-1, 1).repeat(N, axis=1)]  
+            
+        # TODO: Might want to update whittle indices for only those (arms, states) having abs(q_diff) more than a Q_delta  
+        # Update lower and upper bounds of whittle index binary search
+        w_ub = w_ub - (w_ub - w_lb) / 2 * comparison
+        w_lb = w_lb + (w_ub - w_lb) / 2 * (1 - comparison)
+
+    
+    
+    for wh_state in range(n_states):
         # For every wh_state, note which action gives the max Q for all POMDP states
-        action_max_Q = np.argmax(Q, axis=2)
-
+        action_max_Q = np.argmax(Q[wh_state], axis=2)
         # action_max_Q stores the information mentioned below
         # Part 2: figure out which set of argmax in the Bellman equation holds.
         #         V[state] = argmax 0 + w + sum_{next_state} P_passive[state, next_state] V[next_state]
