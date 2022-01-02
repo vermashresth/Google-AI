@@ -7,19 +7,21 @@ import matplotlib.pyplot as plt
 import argparse
 
 special='trial_50ep'
-DF_filename='DF_'+special+'.pickle'
-TS_filename='TS_'+special+'.pickle'
+DF_filename='./results/DF_'+special+'.pickle'
+TS_filename='./results/TS_'+special+'.pickle'
 
 
 parser=argparse.ArgumentParser(description = 'Visulation and tuning DF vs TS comparison')
 parser.add_argument('--epochs', default=10, type=int, help='Number of epochs')
+parser.add_argument('--instances', default=10, type=int, help='Number of instances')
 parser.add_argument('--save', default=False, type=bool, help='Whether or not to save all generated figs')
+parser.add_argument('--seed', default=0, type=int, help='Random seed')
 args=parser.parse_args()
 
 print ('Starting DF to be saved as: '+DF_filename)
-subprocess.run(f'python3 train.py --method DF --sv {DF_filename} --epochs {args.epochs}', shell=True)
+subprocess.run(f'python3 train.py --method DF --sv {DF_filename} --epochs {args.epochs} --instances {args.instances} --seed {args.seed}', shell=True)
 print ('Starting TS to be saved as: '+TS_filename)
-subprocess.run(f'python3 train.py --method TS --sv {TS_filename} --epochs {args.epochs}', shell=True)
+subprocess.run(f'python3 train.py --method TS --sv {TS_filename} --epochs {args.epochs} --instances {args.instances} --seed {args.seed}', shell=True)
 print ('BOTH DONE')
 
 

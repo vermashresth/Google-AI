@@ -20,6 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
     parser.add_argument('--sv', default='.', type=str, help='save string name')
     parser.add_argument('--epochs', default=10, type=int, help='num epochs')
+    parser.add_argument('--instances', default=10, type=int, help='num instances')
     parser.add_argument('--ope', default='IS', type=str, help='importance sampling (IS) or simulation-based (sim).')
     parser.add_argument('--seed', default=0, type=int, help='random seed for synthetic data generation.')
 
@@ -27,7 +28,6 @@ if __name__ == '__main__':
     print('argparser arguments', args)
 
     n_benefs = 50
-    n_instances = 10
     n_trials = 10
     L = 10
     K = 10
@@ -45,6 +45,7 @@ if __name__ == '__main__':
     ope_mode = args.ope
 
     # dataset generation
+    n_instances = args.instances
     full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H, seed=seed)
     train_dataset = full_dataset[:int(n_instances*0.7)]
     val_dataset   = full_dataset[int(n_instances*0.7):int(n_instances*0.8)]
@@ -102,7 +103,8 @@ if __name__ == '__main__':
                     else:
                         raise NotImplementedError
 
-                    performance = -ope
+                    ts_weight = 0.1
+                    performance = -ope * (1 - ts_weight) + loss * ts_weight
 
                 # backpropagation
                 if mode == 'train' and epoch<total_epoch and epoch>0:

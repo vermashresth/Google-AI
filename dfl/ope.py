@@ -191,3 +191,8 @@ class opeSimulator(object):
             return dtotal_dw * dsoln
 
         return tf.stop_gradient(average_reward), gradient_function
+
+def TSLoss(T_data, state_record, action_record, reward_record):
+    # TODO: compute the negative log-likelihood of seeing state, action, reward pairs.
+    return
+
