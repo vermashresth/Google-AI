@@ -10,7 +10,7 @@ sys.path.insert(0, "../")
 from dfl.model import ANN
 from dfl.synthetic import generateDataset
 from dfl.whittle import whittleIndex, newWhittleIndex
-from dfl.utils import getSoftTopk
+from dfl.utils import getSoftTopk, twoStageNLLLoss
 from dfl.ope import opeIS, opeIS_parallel
 from dfl.environments import POMDP2MDP
 
@@ -82,8 +82,8 @@ if __name__ == '__main__':
                     if epoch==total_epoch:
                         prediction=label
                     
-                    loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
-                    
+                    # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
+                    loss = twoStageNLLLoss(traj, prediction, beh_policy_name) # Two-stage custom NLL loss
 
                     # Setup MDP or POMDP environment
                     if env=='general':

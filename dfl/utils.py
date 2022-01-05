@@ -13,7 +13,7 @@ sys.path.insert(0, "../")
 
 from itertools import combinations
 
-from dfl.config import N_ACTIONS, N_STATES
+from dfl.config import N_ACTIONS, N_STATES, dim_dict, policy_map
 
 def nck(n, k):
     return math.factorial(n)/(math.factorial(k)*math.factorial(n-k))
@@ -89,6 +89,30 @@ def takeActions(states, T, actions):
         next_states[i] = np.random.choice(a=m, size=1, p=T[i,states[i],actions[i],:])
     return next_states.astype('int64')
 
+def twoStageNLLLoss(traj, prediction, policy):
+    s = traj[:, # trial index
+                                policy_map[policy], # policy index
+                                :, # time index
+                                dim_dict['state'], # tuple dimension
+                                : # benef index
+                                ].astype(int).flatten()
+    a = traj[:, # trial index
+                                policy_map[policy], # policy index
+                                :, # time index
+                                dim_dict['action'], # tuple dimension
+                                : # benef index
+                                ].astype(int).flatten()
+    s_prime = traj[:, # trial index
+                                policy_map[policy], # policy index
+                                :, # time index
+                                dim_dict['next_state'], # tuple dimension
+                                : # benef index
+                                ].astype(int).flatten()
+    n_tr, T, n_benefs = traj.shape[0], traj.shape[2], traj.shape[4]
+    benef_idx = np.arange(n_benefs).reshape(1, -1).repeat(n_tr*T, axis=0).flatten()
+    indices = list(zip(benef_idx, s, a, s_prime))
+    trans_probs = tf.gather_nd(prediction, indices)
+    return -tf.reduce_sum(tf.math.log(trans_probs))
 
 """
 DIFFERENTIALBLE TOP-K LAYER
@@ -119,7 +143,7 @@ class DiffTopK(object):
         Returns: a vector of size ()
 
         """
-        bs, n, = scores.shape # Batch version
+        bs, n, _ = scores.shape # Batch version
         self.bs, self.n = bs, n
         scores = tf.reshape(scores, [bs, n, 1]) 
 
