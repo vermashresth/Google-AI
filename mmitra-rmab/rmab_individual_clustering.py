@@ -54,7 +54,8 @@ CONFIG = {
     "read_sql": int(sys.argv[3]),
     "from_registration_date": sys.argv[4],
     "user_id": sys.argv[5],
-    "password": sys.argv[6]
+    "password": sys.argv[6],
+    "server": sys.argv[7]
 
 }
 
@@ -104,7 +105,7 @@ def run_third_pilot(CONFIG):
       config = {
           'user': CONFIG["user_id"],
           'password': CONFIG["password"],
-          'host': '34.93.237.61',
+          'host': CONFIG["server"],
           'client_flags': [ClientFlag.SSL]
       }
 
