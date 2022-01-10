@@ -55,8 +55,8 @@ def newWhittleIndex(P, R, gamma=0.99):
     w_lb = -np.ones((n_wh_states, N)) # Whittle index lower bound
     w = (w_ub + w_lb) / 2
 
-    n_binary_search_iters = 30 # Using a fixed # of iterations or a tolerance rate instead
-    n_value_iters = 1000
+    n_binary_search_iters = 10 # Using a fixed # of iterations or a tolerance rate instead
+    n_value_iters = 100
 
     # Run binary search for finding whittle index corresponding to each wh_state
     for _ in range(n_binary_search_iters):

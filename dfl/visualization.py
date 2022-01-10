@@ -57,9 +57,20 @@ for mode in modes:
     plt.plot(range(num_epochs), [df_output[1][mode][num_epochs] for _ in range(num_epochs)], '--', label='DF_GT_known')
     plt.plot(range(num_epochs), [ts_output[1][mode][num_epochs] for _ in range(num_epochs)], '--', label='TS_GT_known')
     plt.legend()
-    plt.title(mode+' OPE comparison')
+    plt.title(mode+' OPE (importance sampling) comparison')
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.png')
     plt.show()
 
 
+    #Ope figure
+    plt.figure()
+    plt.plot(range(num_epochs), df_output[2][mode][:num_epochs], label='DF')
+    plt.plot(range(num_epochs), ts_output[2][mode][:num_epochs], label='TS')
+    plt.plot(range(num_epochs), [df_output[2][mode][num_epochs] for _ in range(num_epochs)], '--', label='DF_GT_known')
+    plt.plot(range(num_epochs), [ts_output[2][mode][num_epochs] for _ in range(num_epochs)], '--', label='TS_GT_known')
+    plt.legend()
+    plt.title(mode+' OPE (simulation-based) comparison')
+    if args.save:
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_sim.png')
+    plt.show()
