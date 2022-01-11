@@ -14,10 +14,13 @@ from dfl.utils import getSoftTopk, twoStageNLLLoss
 from dfl.ope import opeIS, opeIS_parallel
 from dfl.environments import POMDP2MDP
 
+from armman.offline_trajectory import get_offline_dataset
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ARMMAN decision-focused learning')
     parser.add_argument('--method', default='TS', type=str, help='TS (two-stage learning) or DF (decision-focused learning).')
     parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
+    parser.add_argument('--data', default='synthetic', type=str, help='synthetic or pilot')
     parser.add_argument('--sv', default='.', type=str, help='save string name')
     parser.add_argument('--epochs', default=10, type=int, help='num epochs')
     parser.add_argument('--instances', default=50, type=int, help='num instances')
@@ -44,9 +47,23 @@ if __name__ == '__main__':
     # Evaluation setup
     ope_mode = args.ope
 
-    # dataset generation
-    n_instances = args.instances
-    full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H, seed=seed)
+    if args.data=='pilot':
+        n_instances = 12
+        all_n_benefs = 7668
+        n_benefs = int(all_n_benefs/n_instances)
+        n_trials = 1
+        L = 7
+        H = 7
+        K = int(225/n_instances)
+        n_states = 2
+        gamma = 0.99
+        full_dataset = get_offline_dataset(beh_policy_name, L)
+    else:
+        # dataset generation
+        n_instances = args.instances
+        full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H, seed=seed)
+
+
     train_dataset = full_dataset[:int(n_instances*0.7)]
     val_dataset   = full_dataset[int(n_instances*0.7):int(n_instances*0.8)]
     test_dataset  = full_dataset[int(n_instances*0.8):]
@@ -72,14 +89,14 @@ if __name__ == '__main__':
             if mode == 'train':
                 dataset = tqdm.tqdm(dataset)
 
-            for (feature, label, raw_R_data, traj, ope_simulator, simulated_rewards, state_record, action_record, reward_record) in dataset:
-                feature, label = tf.constant(feature, dtype=tf.float32), tf.constant(label, dtype=tf.float32)
+            for (feature, _, raw_R_data, traj, ope_simulator, _, state_record, action_record, reward_record) in dataset:
+                feature = tf.constant(feature, dtype=tf.float32)
                 raw_R_data = tf.constant(raw_R_data, dtype=tf.float32)
 
                 with tf.GradientTape() as tape:
                     prediction = model(feature) # Transition probabilities
-                    if epoch==total_epoch:
-                        prediction=label
+                    # if epoch==total_epoch:
+                    #     prediction=label
                     
                     # start_time = time.time()
                     # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
@@ -104,7 +121,7 @@ if __name__ == '__main__':
                     # start_time = time.time()
                     ope_IS = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
                             target_policy_name, beh_policy_name)
-                    ope_sim = ope_simulator(w)
+                    ope_sim = ope_simulator(w, K)
                     # ope_sim = ope_simulator(tf.reshape(w, (n_benefs, n_full_states)))
                     if ope_mode == 'IS': # importance-sampling based OPE
                         ope = ope_IS

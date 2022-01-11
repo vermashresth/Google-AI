@@ -90,26 +90,28 @@ def takeActions(states, T, actions):
     return next_states.astype('int64')
 
 def twoStageNLLLoss(traj, prediction, policy):
+    n_tr, T, n_benefs = traj.shape[0], traj.shape[2], traj.shape[4]
+    
     s = traj[:, # trial index
                                 policy_map[policy], # policy index
-                                :, # time index
+                                :T-1, # time index
                                 dim_dict['state'], # tuple dimension
                                 : # benef index
                                 ].astype(int).flatten()
     a = traj[:, # trial index
                                 policy_map[policy], # policy index
-                                :, # time index
+                                :T-1, # time index
                                 dim_dict['action'], # tuple dimension
                                 : # benef index
                                 ].astype(int).flatten()
     s_prime = traj[:, # trial index
                                 policy_map[policy], # policy index
-                                :, # time index
+                                :T-1, # time index
                                 dim_dict['next_state'], # tuple dimension
                                 : # benef index
                                 ].astype(int).flatten()
-    n_tr, T, n_benefs = traj.shape[0], traj.shape[2], traj.shape[4]
-    benef_idx = np.arange(n_benefs).reshape(1, -1).repeat(n_tr*T, axis=0).flatten()
+    
+    benef_idx = np.arange(n_benefs).reshape(1, -1).repeat(n_tr*(T-1), axis=0).flatten()
     indices = list(zip(benef_idx, s, a, s_prime))
     trans_probs = tf.gather_nd(prediction, indices)
     return -tf.reduce_sum(tf.math.log(trans_probs)) / n_tr
