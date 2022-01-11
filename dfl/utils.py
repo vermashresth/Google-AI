@@ -114,7 +114,7 @@ def twoStageNLLLoss(traj, prediction, policy):
     benef_idx = np.arange(n_benefs).reshape(1, -1).repeat(n_tr*(T-1), axis=0).flatten()
     indices = list(zip(benef_idx, s, a, s_prime))
     trans_probs = tf.gather_nd(prediction, indices)
-    return -tf.reduce_sum(tf.math.log(trans_probs))
+    return -tf.reduce_sum(tf.math.log(trans_probs)) / n_tr
 
 """
 DIFFERENTIALBLE TOP-K LAYER
@@ -145,7 +145,7 @@ class DiffTopK(object):
         Returns: a vector of size ()
 
         """
-        bs, n, _ = scores.shape # Batch version
+        bs, n = scores.shape # Batch version
         self.bs, self.n = bs, n
         scores = tf.reshape(scores, [bs, n, 1]) 
 

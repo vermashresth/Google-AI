@@ -23,18 +23,18 @@ if __name__ == '__main__':
     parser.add_argument('--data', default='synthetic', type=str, help='synthetic or pilot')
     parser.add_argument('--sv', default='.', type=str, help='save string name')
     parser.add_argument('--epochs', default=10, type=int, help='num epochs')
-    parser.add_argument('--instances', default=10, type=int, help='num instances')
+    parser.add_argument('--instances', default=50, type=int, help='num instances')
     parser.add_argument('--ope', default='IS', type=str, help='importance sampling (IS) or simulation-based (sim).')
     parser.add_argument('--seed', default=0, type=int, help='random seed for synthetic data generation.')
 
     args = parser.parse_args()
     print('argparser arguments', args)
 
-    n_benefs = 50
+    n_benefs = 100
     n_trials = 10
     L = 10
-    K = 10
-    n_states = 3
+    K = 20
+    n_states = 2
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
@@ -78,15 +78,14 @@ if __name__ == '__main__':
     # training
     training_mode = 'two-stage' if args.method == 'TS' else 'decision-focused'
     total_epoch = args.epochs
-    overall_loss={}
-    overall_ope={}
+    overall_loss = {'train': [], 'test': [], 'val': []} # two-stage loss
+    overall_ope = {'train': [], 'test': [], 'val': []} # OPE IS
+    overall_ope_sim = {'train': [], 'test': [], 'val': []} # OPE simulation
     for epoch in range(total_epoch+1):
         for mode, dataset in dataset_list:
-            if epoch==0:
-                overall_loss[mode]=[]
-                overall_ope[mode]=[]
             loss_list = []
-            ope_list = []
+            ope_list = [] # OPE IS
+            ope_sim_list = [] # OPE simulation
             if mode == 'train':
                 dataset = tqdm.tqdm(dataset)
 
@@ -99,26 +98,38 @@ if __name__ == '__main__':
                     # if epoch==total_epoch:
                     #     prediction=label
                     
+                    # start_time = time.time()
                     # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
                     loss = twoStageNLLLoss(traj, prediction, beh_policy_name) # Two-stage custom NLL loss
+                    # print('two stage loss time:', time.time() - start_time)
 
                     # Setup MDP or POMDP environment
                     if env=='general':
                         T_data, R_data = prediction, raw_R_data
+                        n_full_states = n_states
                     elif env=='POMDP':
                         T_data, R_data = POMDP2MDP(prediction, raw_R_data, H)
-                    
+                        n_full_state = n_states * H
+
                     # Batch Whittle index computation
+                    # start_time = time.time()
                     # w = whittleIndex(prediction)
                     w = newWhittleIndex(T_data, R_data)
+                    w = tf.reshape(w, (n_benefs, n_full_states))
+                    # print('Whittle index time:', time.time() - start_time)
                     
+                    # start_time = time.time()
+                    ope_IS = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
+                            target_policy_name, beh_policy_name)
+                    ope_sim = ope_simulator(w, K)
+                    # ope_sim = ope_simulator(tf.reshape(w, (n_benefs, n_full_states)))
                     if ope_mode == 'IS': # importance-sampling based OPE
-                        ope = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
-                                target_policy_name, beh_policy_name)
+                        ope = ope_IS
                     elif ope_mode == 'sim': # simulation-based OPE
-                        ope = ope_simulator(w, K)
+                        ope = ope_sim
                     else:
                         raise NotImplementedError
+                    # print('Evaluation time:', time.time() - start_time)
 
                     ts_weight = 0.1
                     performance = -ope * (1 - ts_weight) + loss * ts_weight
@@ -135,16 +146,18 @@ if __name__ == '__main__':
                 del tape
 
                 loss_list.append(loss)
-                ope_list.append(ope)
+                ope_list.append(ope_IS)
+                ope_sim_list.append(ope_sim)
 
-            print(f'Epoch {epoch}, {mode} mode, average loss {np.mean(loss_list)}, average ope {np.mean(ope_list)}')
+            print(f'Epoch {epoch}, {mode} mode, average loss {np.mean(loss_list)}, average ope (IS) {np.mean(ope_list)}, average ope (sim) {np.mean(ope_sim_list)}')
             
             overall_loss[mode].append(np.mean(loss_list))
             overall_ope[mode].append(np.mean(ope_list))
+            overall_ope_sim[mode].append(np.mean(ope_sim_list))
 
     
     if not(args.sv == '.'):
         ### Output to be saved, else do nothing. 
         with open(args.sv, 'wb') as filename:
-            pickle.dump([overall_loss, overall_ope], filename)
+            pickle.dump([overall_loss, overall_ope, overall_ope_sim], filename)
 

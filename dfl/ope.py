@@ -167,32 +167,32 @@ class opeSimulator(object):
         compute = tf.custom_gradient(lambda x: self._compute(x))
         return compute(w)
 
-    def _compute(self, w):
+    def _compute(self, w_raw):
+        w = tf.stop_gradient(w_raw)
         # Fast soft Whittle simulation
         traj, simulated_rewards, state_record, action_record, reward_record = getSimulatedTrajectories(
                                                     n_benefs=self.n_benefs, T=self.T, K=self.K, n_trials=self.OPE_sim_n_trials, gamma=self.gamma,
                                                     T_data=self.emp_T_data, R_data=self.emp_R_data,
-                                                    w=w.numpy(), select_full=True, policies=[3], fast=True
+                                                    w=w.numpy(), policies=[3], fast=True
                                                     )
         
         average_reward = tf.reduce_mean(tf.convert_to_tensor(simulated_rewards, dtype=tf.float32))
 
         def gradient_function(dsoln):
-            cumulative_rewards = tf.math.cumsum(tf.convert_to_tensor(reward_record, dtype=tf.float32), axis=2)
+            cumulative_rewards = tf.math.cumsum(tf.convert_to_tensor(reward_record, dtype=tf.float32), axis=2, reverse=True)
             with tf.GradientTape() as tmp_tape:
                 tmp_tape.watch(w)
-                selected_probs = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K), (-1, 1, self.T, self.n_benefs))
+                probs_raw = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K), (self.OPE_sim_n_trials, self.T, self.n_benefs))
+                selected_probs = probs_raw * action_record[:,0,:,:] + (1 - probs_raw) * (1 - action_record[:,0,:,:]) # [ntr, 1, self.T, n_benefs]
+
+                # tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K), (-1, 1, self.T, self.n_benefs))
                 selected_logprobs = tf.math.log(selected_probs)
                 
-                total_reward = tf.reduce_mean(tf.reduce_sum(cumulative_rewards * selected_logprobs, axis=(2,3)))
+                total_reward = tf.reduce_mean(tf.reduce_sum(cumulative_rewards[:,0,:,:] * selected_logprobs, axis=(1,2)))
 
             dtotal_dw = tmp_tape.gradient(total_reward, w)
 
             return dtotal_dw * dsoln
 
         return tf.stop_gradient(average_reward), gradient_function
-
-def TSLoss(T_data, state_record, action_record, reward_record):
-    # TODO: compute the negative log-likelihood of seeing state, action, reward pairs.
-    return
 
