@@ -17,6 +17,7 @@ parser.add_argument('--save', default=0, type=int, help='Whether or not to save 
 parser.add_argument('--plot', default=0, type=int, help='Whether or not to create plots. Put 0 for False, 1 for True')
 parser.add_argument('--compute', default=0, type=int, help='Whether or not to run new experiments. Put 0 for False, 1 for True')
 parser.add_argument('--tr', default=1, type=int, help='Number of trials to be run starting with seed value entered for seed.')
+parser.add_argument('--name', default='.', type=str, help='Special string name.')
 args=parser.parse_args()
 
 
@@ -24,6 +25,9 @@ args.save=bool(args.save)
 args.plot=bool(args.plot)
 args.compute=bool(args.compute)
 
+if not args.name=='.':
+  special=args.name
+  print ("Using special save string: ", special)
 
 if args.compute:
   ### Launch new computational experiments for the specified settings if True 
