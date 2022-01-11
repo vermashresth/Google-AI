@@ -3,28 +3,27 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - ca-certificates=2021.10.8=h033912b_0
-  - certifi=2021.10.8=py38h50d1736_1
-  - libcxx=12.0.0=h2f01273_0
-  - libffi=3.3=hb1e8313_2
-  - libgfortran=5.0.0=9_3_0_h6c81a4c_23
-  - libgfortran5=9.3.0=h6c81a4c_23
-  - llvm-openmp=12.0.1=hda6cdc1_1
-  - mpi=1.0=mpich
-  - mpi4py=3.1.2=py38hcd6a4d3_0
-  - mpich=3.4.2=hd33e60e_100
-  - ncurses=6.3=hca72f7f_2
-  - openssl=1.1.1l=h0d85af4_0
-  - pip=21.2.4=py38hecd8cb5_0
-  - python=3.8.12=h88f2d9e_0
-  - python_abi=3.8=2_cp38
-  - readline=8.1=h9ed2024_0
-  - setuptools=58.0.4=py38hecd8cb5_0
-  - sqlite=3.36.0=hce871da_0
-  - tk=8.6.11=h7bc2e8c_0
-  - wheel=0.37.0=pyhd3eb1b0_1
-  - xz=5.2.5=h1de35cc_0
-  - zlib=1.2.11=h1de35cc_3
+  - ca-certificates==2021.10.8
+  - certifi==2021.10.8
+  - libcxx==12.0.0
+  - libffi==3.3
+  - libgfortran5==9.3.0
+  - llvm-openmp==12.0.1
+  - mpi==1.0
+  - mpi4py==3.1.2
+  - mpich==3.4.2
+  - ncurses==6.3
+  - openssl==1.1.1l
+  - pip==21.2.4
+  - python==3.8.12
+  - python_abi==3.8
+  - readline==8.1
+  - setuptools==58.0.4
+  - sqlite==3.36.0
+  - tk==8.6.11
+  - wheel==0.37.0
+  - xz==5.2.5
+  - zlib==1.2.11
   - pip:
     - appnope==0.1.2
     - attrs==21.2.0
@@ -66,3 +65,4 @@ dependencies:
     - traitlets==5.1.1
     - typing-extensions==3.10.0.2
     - wcwidth==0.2.5
+
