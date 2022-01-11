@@ -39,12 +39,6 @@ if args.compute:
     subprocess.run(f'python3 train.py --method TS --sv {TS_filename} --epochs {args.epochs} --instances {args.instances} --seed {sd}', shell=True)
     print ('BOTH DONE')
 
-    with open (DF_filename, 'rb') as df_file:
-        df_output=pickle.load(df_file)
-
-    with open (TS_filename, 'rb') as ts_file:
-        ts_output=pickle.load(ts_file)
-
 
 
 if args.plot:
@@ -98,12 +92,14 @@ if args.plot:
     plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2)
 
     plt.legend()
+    plt.xlabel('Epochs')
+    plt.ylabel('Intermediate Loss')
     plt.title(mode+' Loss comparison')
     if args.save:
         plt.savefig('./figs/'+special+'_'+mode+'_loss.png')
     plt.show()
 
-    ### OPE figure
+    ### IS OPE figure
     plt.figure()
     
     df_means=[]
@@ -137,8 +133,52 @@ if args.plot:
  
     
     plt.legend()
-    plt.title(mode+' OPE comparison')
+    plt.xlabel('Epochs')
+    plt.ylabel('IS OPE')
+    plt.title(mode+' OPE (importance sampling) comparison')
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.png')
+    plt.show()
+
+
+    ### SIM  OPE figure
+    plt.figure()
+    
+    df_means=[]
+    df_errors=[]
+    ts_means=[]
+    ts_errors=[]
+    
+    for epoch in range(num_epochs+1):
+        df_outputs_for_this_epoch=np.array([item[2][mode][epoch] for item in df_outputs])
+        ts_outputs_for_this_epoch=np.array([item[2][mode][epoch] for item in ts_outputs])
+
+        df_means.append(np.mean(df_outputs_for_this_epoch))
+        ts_means.append(np.mean(ts_outputs_for_this_epoch))
+
+        df_errors.append(np.std(df_outputs_for_this_epoch)/np.sqrt(len(df_outputs_for_this_epoch)))
+        ts_errors.append(np.std(ts_outputs_for_this_epoch)/np.sqrt(len(ts_outputs_for_this_epoch)))
+    
+    df_means=np.array(df_means)
+    df_errors=np.array(df_errors)
+    ts_means=np.array(ts_means)
+    ts_errors=np.array(ts_errors)
+
+    plt.plot(range(num_epochs), df_means[:num_epochs], label='DF')
+    plt.fill_between(range(num_epochs), df_means[:num_epochs]-df_errors[:num_epochs], df_means[:num_epochs]+df_errors[:num_epochs], alpha=0.2)
+    
+    plt.plot(range(num_epochs), ts_means[:num_epochs], label='TS')
+    plt.fill_between(range(num_epochs), ts_means[:num_epochs]-ts_errors[:num_epochs], ts_means[:num_epochs]+ts_errors[:num_epochs], alpha=0.2)
+    
+    plt.errorbar(range(num_epochs), [df_means[num_epochs] for _ in range(num_epochs)], yerr=[df_errors[num_epochs] for _ in range(num_epochs)],  fmt='--', capsize=4, label='DF_GT_known')
+    plt.errorbar(range(num_epochs), [ts_means[num_epochs] for _ in range(num_epochs)], yerr=[ts_errors[num_epochs] for _ in range(num_epochs)] , fmt='--', capsize=4, label='TS_GT_known')
+ 
+    
+    plt.legend()
+    plt.xlabel('Epochs')
+    plt.ylabel('SIM OPE')
+    plt.title(mode+' OPE (SIM) comparison')
+    if args.save:
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.png')
     plt.show()
 
