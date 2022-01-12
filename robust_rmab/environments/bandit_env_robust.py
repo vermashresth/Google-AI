@@ -962,9 +962,9 @@ class CounterExampleRobustEnv(gym.Env):
         return [seed1]
 
 import pickle
-# file = 'armman_params.pickle'
-# file = 'armman_params_small.pickle'
-file = 'armman_params_very_small.pickle'
+# file = 'armman_params.pickle' # n_clusters = 40, n_arms = 7668. use N = 80, B<7668
+# file = 'armman_params_small.pickle' # n_clusters = 26, n_arms = 100. use N = 52, B<100
+file = 'armman_params_very_small.pickle' # n_clusters = 5, n_arms = 15, use N = 10, B<15
 
 with open(file, 'rb') as handle:
     print('Loading Pickled Params...')
@@ -982,7 +982,8 @@ class ARMMANRobustEnv(gym.Env):
             info_dict['n_clusters'], info_dict['cluster_mapping'], info_dict['max_cluster_size'], info_dict['parameter_ranges']
  
         
-        assert self.n_clusters*S == N
+        assert self.n_clusters*S == N, f'n_clusters = {self.n_clusters}, S={S}, N={N}. self.n_clusters*S should be same as N'
+
         # Here N is not number of arms but size of problem. It is equal to number of clusters times number of states
         self.N = N
         self.n_arms = len(self.cluster_mapping)
@@ -1004,6 +1005,7 @@ class ARMMANRobustEnv(gym.Env):
         self.A = A
         self.B = B
 
+        assert self.B < self.n_arms, f'self.B = {self.B}, self.n_arms = {self.n_arms}. self.B should be less than self.n_arms'
         self.init_seed = seed
 
         self.random_stream = np.random.RandomState()
@@ -1129,22 +1131,6 @@ class ARMMANRobustEnv(gym.Env):
             Here the mapping is not trivial and involves distributing total budget proportionally (wrt to cluster size) to some/all
             clusters. We also need a hyperparameter controlling how many clusters we want to split budget in.
 
-
-
-        When a_agent is specified and 
-        For 
-        self.n_arms: number of actual arms
-        self.N: number of clusters x 2 states
-        self.T: self.N x state x action x state level Transition probabilities
-        self.cluster_T : self.C x state x action x state
-        a_agent: self.N sized vector, boolean for every cluster x state
-        a_nature : self.N x state x action
-        next_full_state, current_full_state: self.N sized: should store counts here
-        next_arms_state, current_arms_state: self.n_arms sized array
-        self.arms_T: self.n_arms x state x action x state level Transition probabilities
-        cluster_mapping: self.n_arms sized array 
-        self.B : select B out of cluster x S grps
-        self.actual B: select actualB out of n_arms
         '''
         # For all transition parameters outputed by nature, first bound them within allowed param range
         for arm_i in range(a_nature.shape[0]):
