@@ -454,15 +454,18 @@ class NatureOracle:
 
 
         # Create actor-critic module
+        # This becomes the basis of nature's policy
         ac = ma_actor_critic(env.observation_space, env.action_space, env.sampled_parameter_ranges,
              env.action_dim_nature, env=env,
              N = env.N, C = env.C, B = env.B, strat_ind = self.strat_ind,
              one_hot_encode = self.one_hot_encode, non_ohe_obs_dim = self.non_ohe_obs_dim,
             state_norm=self.state_norm, nature_state_norm=self.nature_state_norm,
             **ac_kwargs)
+        # create Whittle index policy. This helps in computing optimal policy against nature's actions
         wh_policy = WhittlePolicy(env.N, env.S, env.B,
                                 10, 0.9
                                  )
+        # Define the observation and action dimensions
         act_dim_agent = ac.act_dim_agent
         act_dim_nature = ac.act_dim_nature
         obs_dim = ac.obs_dim
@@ -473,54 +476,13 @@ class NatureOracle:
 
         # Set up experience buffer
         local_steps_per_epoch = int(steps_per_epoch / num_procs())
-        # buf = MA_RMABPPO_Buffer(obs_dim, act_dim_agent, act_dim_nature, env.N, ac.act_type, local_steps_per_epoch, 
-        #     one_hot_encode=self.one_hot_encode, gamma=gamma, lam_OTHER=lam_OTHER)
 
         buf = MA_RMABPPO_Whittle_Buffer(obs_dim, act_dim_agent, act_dim_nature, env.N, ac.act_type, local_steps_per_epoch, 
             one_hot_encode=self.one_hot_encode, gamma=gamma, lam_OTHER=lam_OTHER)
         FINAL_TRAIN_LAMBDAS = final_train_lambdas
 
 
-        # Set up function for computing MA_RMABPPO policy loss
-        # def compute_loss_pi_agent(data, entropy_coeff):
-        #     ohs, act, adv, logp_old, lambdas, obs = data['ohs'], data['act_agent'], data['adv_agent'], data['logp_agent'], data['lambdas'], data['obs']
-
-        #     lamb_to_concat = np.repeat(lambdas, env.N).reshape(-1,env.N,1)
-        #     full_obs = None
-        #     if ac.one_hot_encode:
-        #         full_obs = torch.cat([ohs, lamb_to_concat], axis=2)
-        #     else:
-        #         obs = obs/self.state_norm
-        #         obs = obs.reshape(obs.shape[0], obs.shape[1], 1)
-        #         full_obs = torch.cat([obs, lamb_to_concat], axis=2)
-
-        #     loss_pi_list = np.zeros(env.N,dtype=object)
-        #     pi_info_list = np.zeros(env.N,dtype=object)
-
-        #     # Policy loss
-        #     for i in range(env.N):
-        #         pi, logp = ac.pi_list_agent[i](full_obs[:, i], act[:, i])
-        #         ent = pi.entropy().mean()
-        #         ratio = torch.exp(logp - logp_old[:, i])
-        #         clip_adv = torch.clamp(ratio, 1-clip_ratio, 1+clip_ratio) * adv[:, i]
-        #         loss_pi = -(torch.min(ratio * adv[:, i], clip_adv)).mean()
-                
-        #         # subtract entropy term since we want to encourage it 
-        #         loss_pi -= entropy_coeff*ent
-
-        #         loss_pi_list[i] = loss_pi
-
-        #         # Useful extra info
-        #         approx_kl = (logp_old[:, i] - logp).mean().item()
-        #         # ent = pi.entropy().mean().item()
-        #         clipped = ratio.gt(1+clip_ratio) | ratio.lt(1-clip_ratio)
-        #         clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().item()
-        #         pi_info = dict(kl=approx_kl, ent=ent.item(), cf=clipfrac)
-        #         pi_info_list[i] = pi_info
-
-        #     return loss_pi_list, pi_info_list
-
-        # Set up function for computing MA_RMABPPO policy loss
+        # Set up function for computing nature policy loss
         def compute_loss_pi_nature(data, entropy_coeff):
             obs, act, adv, logp_old = data['obs'], data['act_nature'], data['adv_nature'], data['logp_nature']
 
@@ -549,40 +511,8 @@ class NatureOracle:
 
             return loss_pi, pi_info
 
-        # Set up function for computing value loss
-        # def compute_loss_v_agent(data):
-        #     ohs, ret, lambdas, act_nature, obs = data['ohs'], data['ret_agent'], data['lambdas'], data['act_nature'], data['obs']
-
-        #     # some semi-annoying array manip to broadcast the single value of lambda
-        #     # to fit the data shape of the observations
-        #     lamb_to_concat = np.repeat(lambdas, env.N).reshape(-1,env.N,1)
-            
-        #     a_nature_env = np.zeros(act_nature.shape)
-
-        #     # print(act_nature)
-        #     for i in range(len(act_nature)):
-        #         a_nature_env[i] = ac.bound_nature_actions(act_nature[i], state=obs[i], reshape=False)
-
-        #     # Similar semi-annoying array manip
-        #     a_nature_env = np.repeat(a_nature_env,env.N,axis=0).reshape(-1, env.N, a_nature_env.shape[1])
-
-        #     if ac.one_hot_encode:
-        #         full_obs = torch.cat([ohs, lamb_to_concat, torch.as_tensor(a_nature_env, dtype=torch.float32)], axis=2)
-        #     else:
-        #         obs = obs/self.state_norm
-        #         obs = obs.reshape(obs.shape[0], obs.shape[1], 1)
-        #         full_obs = torch.cat([obs, lamb_to_concat, torch.as_tensor(a_nature_env, dtype=torch.float32)], axis=2)
-
-            
-        #     # full_obs = torch.cat([ohs, lamb_to_concat, a_nature_env], axis=2)
-
-        #     loss_list = np.zeros(env.N,dtype=object)
-        #     for i in range(env.N):
-        #         loss_list[i] = ((ac.v_list_agent[i](full_obs[:, i]) - ret[:, i])**2).mean()
-        #     return loss_list
-
-
-        # nature value function takes agent action as input
+        # Set up function for computing MA_RMABPPO nature's value fn loss
+        # Note that nature value function takes agent action as input. This is supplied through data
         def compute_loss_v_nature(data):
             obs, ret, act_agent = data['obs'], data['ret_nature'], data['act_agent']
             # oha_agent = np.zeros(ac.act_dim_agent)
@@ -593,56 +523,9 @@ class NatureOracle:
             x_s_a_agent = torch.as_tensor(np.concatenate([obs, act_agent],axis=1), dtype=torch.float32)
             return ((ac.v_nature(x_s_a_agent) - ret)**2).mean()
 
-
-        # # Deprecated
-        # def compute_loss_q(data):
-
-        #     ohs, qs, oha, lambdas  = data['ohs'], data['qs'], data['oha'], data['lambdas']
-        #     lamb_to_concat = np.repeat(lambdas, env.N).reshape(-1,env.N,1)
-        #     full_obs = torch.cat([ohs, lamb_to_concat], axis=2)
-
-        #     loss_list = np.zeros(env.N,dtype=object)
-        #     for i in range(env.N):
-        #         x = torch.as_tensor(np.concatenate([full_obs[:, i], oha[:, i]], axis=1), dtype=torch.float32)
-        #         loss_list[i] = ((ac.q_list[i](x) - qs[:, i])**2).mean()
-        #     return loss_list
-
-
-        # def compute_loss_lambda(data):
-
-        #     disc_cost = data['costs'][0]
-        #     # lamb = data['lambdas'][0]
-        #     obs = data['obs'][0]
-        #     if not self.one_hot_encode:
-        #         obs = obs/self.state_norm
-
-        #     lamb = ac.lambda_net(torch.as_tensor(obs,dtype=torch.float32))
-        #     # print('lamb',lamb, 'term 1', env.B/(1-gamma), 'cost',disc_cost, 'diff', env.B/(1-gamma) - disc_cost)
-            
-        #     loss = lamb*(env.B/(1-gamma) - disc_cost)
-        #     # print(loss)
-
-        #     return loss
-
-        # Set up optimizers for policy and value function
-        # pi_agent_optimizers = np.zeros(env.N,dtype=object)
-        # vf_agent_optimizers = np.zeros(env.N,dtype=object)
-        qf_nature_optimizers = np.zeros(env.N,dtype=object)
-
-        # for i in range(env.N):
-        #     # pi_agent_optimizers[i] = Adam(ac.pi_list_agent[i].parameters(), lr=pi_lr_agent)
-        #     # # pi_optimizers[i] = SGD(ac.pi_list[i].parameters(), lr=pi_lr)
-        #     # vf_agent_optimizers[i] = Adam(ac.v_list_agent[i].parameters(), lr=vf_lr_agent)
-        #     # # vf_optimizers[i] = SGD(ac.v_list[i].parameters(), lr=vf_lr)
-        #     qf_nature_optimizers[i] = Adam(ac.q_list_agent[i].parameters(), lr=qf_lr)
-            # qf_optimizers[i] = SGD(ac.q_list[i].parameters(), lr=qf_lr)
-        # lambda_optimizer = Adam(ac.lambda_net.parameters(), lr=lm_lr)
-        # lambda_optimizer = SGD(ac.lambda_net.parameters(), lr=lm_lr)
+        # Set up optimizer objects
         pi_nature_optimizer = Adam(ac.pi_nature.parameters(), lr=pi_lr_nature)
-        # pi_optimizers[i] = SGD(ac.pi_list[i].parameters(), lr=pi_lr)
         vf_nature_optimizer = Adam(ac.v_nature.parameters(), lr=vf_lr_nature)
-        # vf_optimizers[i] = SGD(ac.v_list[i].parameters(), lr=vf_lr)
-        qf_nature_optimizer = Adam(ac.q_nature.parameters(), lr=qf_lr)
 
 
         # Set up model saving
@@ -660,63 +543,11 @@ class NatureOracle:
                 # entropy_coeff_schedule = entropy_coeff_schedule[1:] + entropy_coeff_schedule[:1]
                 ind = epoch%lamb_update_freq
                 entropy_coeff = entropy_coeff_schedule[ind]
-            # print('entropy',entropy_coeff)
 
 
-            # Train policy with multiple steps of gradient descent
-            # for i in range(train_pi_iters):
-            #     # for i in range(env.N):
-            #     #     pi_agent_optimizers[i].zero_grad()
-            #     # loss_pi_agent, pi_info_agent = compute_loss_pi_agent(data, entropy_coeff)
-            #     for i in range(env.N):
-            #         kl = mpi_avg(pi_info_agent[i]['kl'])
-            #         # if kl > 1.5 * target_kl:
-            #         #     logger.log('Early stopping at step %d due to reaching max kl.'%i)
-            #         #     break
-            #         loss_pi_agent[i].backward()
-            #         mpi_avg_grads(ac.pi_list_agent[i])    # average grads across MPI processes
-            #         pi_agent_optimizers[i].step()
-
-
-            # logger.store(StopIter=i)
-
-
-
-            # # Value function learning
-            # for i in range(train_v_iters):
-            #     for i in range(env.N):
-            #         vf_agent_optimizers[i].zero_grad()
-            #     loss_v_agent = compute_loss_v_agent(data)
-            #     for i in range(env.N):
-            #         loss_v_agent[i].backward()
-            #         mpi_avg_grads(ac.v_list_agent[i])    # average grads across MPI processes
-            #         vf_agent_optimizers[i].step()
-
-                
-
-
-            # Lambda optimization
-            # sync nature updates with lambda updates..
-            # But Stop training lambdas after a certain point
+            # with lamb_update_freq, update the nature's params
+            # TODO: Since lambda network doesn't exist, rename this to nature_update_freq
             if epoch%lamb_update_freq == 0 and epoch > 0:
-                print('\nUpdate is called\n')
-                # for i in range(train_lam_iters):
-
-                # Should only update this once because we only get one sample from the environment
-                # unless we are running parallel instances
-                # also, eventually freze lambda training
-                # if (epochs - epoch) > FINAL_TRAIN_LAMBDAS:
-                #     lambda_optimizer.zero_grad()
-                #     loss_lamb = compute_loss_lambda(data)
-                    
-                #     loss_lamb.backward()
-                #     last_param = list(ac.lambda_net.parameters())[-1]
-                #     # print('last param',last_param)
-                #     # print('grad',last_param.grad)
-
-                #     mpi_avg_grads(ac.lambda_net)    # average grads across MPI processes
-                #     lambda_optimizer.step()
-
 
                 # UPDATE the nature policy
                 entropy_coeff = 0.0
@@ -770,122 +601,90 @@ class NatureOracle:
          }
 
 
-        INIT_LAMBDA_TRAINS = init_lambda_trains
-
-        # Initialize lambda to make large predictions
-        for i in range(INIT_LAMBDA_TRAINS):
-            init_lambda_optimizer = SGD(ac.lambda_net.parameters(), lr=lm_lr)
-            init_lambda_optimizer.zero_grad()
-            loss_lamb = ac.return_large_lambda_loss(o, gamma)
-            
-            loss_lamb.backward()
-            last_param = list(ac.lambda_net.parameters())[-1]
-
-            mpi_avg_grads(ac.lambda_net)    # average grads across MPI processes
-            init_lambda_optimizer.step()
-
-
-        # always act on arm in state 0
-        def get_action_test_policy(obs):
-            a = np.zeros(obs.shape[0])
-            if int(obs[0])==0 and int(obs[1])==0:
-                choice = np.random.choice(np.arange(2))
-                a[choice] = 1
-            elif int(obs[0])==1 and int(obs[1])==1:
-                # choice = np.random.choice(np.arange(2))
-                # a[choice] = 1
-                pass
-            elif int(obs[0]==0):
-                choice = 0
-                a[choice] = 1
-            elif int(obs[1]==0):
-                choice = 1
-                a[choice] = 1
-            return a
 
         # Review: this number is now small as compared to 50 previously
         NUM_TEST_POLICY_RUNS = 20
-        # Main loop: collect experience in env and update/log each epoch
+        
+
 
         # Sample an agent policy
-        
         # sometimes get negative values that are tiny e.g., -6.54284594e-18, just set them to 0
+        # REVIEW: Currently we heuristically believe that sampling agent_oracle with agent mixed strategy distribution
+        # REVIEW: will give us a mixed agent strategy in expectation. Might want to change this logic in future
+        # TODO: Potentially include whittle policy mixing part here since agent policies are all whittle index policies
         agent_eq = np.array(agent_eq)
         agent_eq[agent_eq < 0] = 0
         agent_eq = agent_eq / agent_eq.sum()
-        # print('agent_eq')
-        # print(agent_eq)
-        ## TODO: Include whittle policy merge part here
+
         
         head_entropy_coeff_schedule = np.linspace(start_entropy_coeff, end_entropy_coeff, epochs)
+        
         print('Learning Nature\'s Best Reponse Strategy')
+        # Main loop: collect experience in env and update/log each epoch
         for epoch in range(epochs):
 
+            # At every learning epoch, resample opponent agent policy
             agent_pol = np.random.choice(agent_strats, p=agent_eq)
             print('\nChosen agent pol', agent_pol, '\n')
+            
+            # Set env's initial state to init_o
             # env.current_full_state = init_o
             env.current_count_state = init_o
             o = init_o
 
-
-            # print("start state",o)
-            # current_lamb = 0
-            # with torch.no_grad():
-            #     current_lamb = ac.lambda_net(torch.as_tensor(o, dtype=torch.float32))
-            #     logger.store(Lamb=current_lamb)
-
-            
-            # Resample agent policy every time we update lambda
-            # if epoch%lamb_update_freq == 0 and epoch > 0:
-            #     agent_pol = np.random.choice(agent_strats, p=agent_eq)
-
-            ## DONE: Need to figure out how to give nature action here
-            ## This should probably use nature's avg strategy params
+            ## To compute agent optimal policy, use nature's avg params
             with torch.no_grad():
                 a_nature_mu = ac.pi_nature.mu_net(torch.as_tensor(o, dtype=torch.float32))
                 a_nature_env_mu = ac.bound_nature_actions(a_nature_mu, state=o, reshape=True)
-                # print(a_nature_env_mu.shape)
+
+            # Learn Optimal Whittle Index Agent policy aginst nature avg params
             wh_policy.note_env(env)
             wh_policy.learn(a_nature_env_mu)
 
+            # Run simulation for `local_steps_per_epoch` timesteps
             for t in range(local_steps_per_epoch):
                 torch_o = torch.as_tensor(o, dtype=torch.float32)
-                # a_agent, v_agent, logp_agent, q_agent, a_nature, v_nature, logp_nature, q_nature, probs_agent = ac.step(torch_o, current_lamb)
-
-                # here for nature's value function
                 
+                # ac's step function requires both world observation (for actor) and agent_policy's actions (for critic)
+                # but we can only obtain agent_policy's actions after determining nature's action
+                # so we split the ac.step into two parts, first pass some dummy agent_policy action
                 a_agent_list_dummy = np.zeros(self.N)
-                # np.ones(self.N,dtype=int)
+                
+                # We obtain nature's action
                 a_nature, _, logp_nature, q_nature = ac.step(torch_o, a_agent_list_dummy)
 
+                # Bound nature's actions within allowed range
                 a_nature_env = ac.bound_nature_actions(a_nature, state=o, reshape=True)
                 
-                # wh_policy.learn(a_nature_env)
+                # Use optimal agent policy `wh_policy` and pass to env.step to obtain next state and reward
+                # env.step function internally calls wh_policy to obtain cluster level and arm level actions
+                # Also note that r_agent is reward of optimal agent
                 next_o, r_agent, d, _ = env.step(None, a_nature_env, wh_policy)
                 current_lamb = env.current_lamb
 
+                # We can now obtain actual cluster level agent actions
                 a_agent_list = env.clustered_actions
-                _, v_nature, _, _ = ac.step(torch_o, a_agent_list)
 
+                # Use actual cluster level agent actions to obtain critic network output
+                _, v_nature, _, _ = ac.step(torch_o, a_agent_list)
 
                 next_o = next_o.reshape(-1)
             
-
                 s = time.time()
                 test_r_list = np.zeros(NUM_TEST_POLICY_RUNS)
-
-                # only need to sample the action once if this is deterministic
-                a_test = agent_pol.act_test(torch_o)
+                
  
                 # TODO: Optimize the sampling (reduce 50 to 5? or 1??)
+
                 for trial in range(NUM_TEST_POLICY_RUNS):
+                    # Set env's state to current world state
                     # env.current_full_state = o
                     env.current_count_state = o
-                    # uncomment this if you want stochastic actions from the agent
-                    # a_test = agent_pol.act_test(torch_o)
                     
-                    # next_o_sample, r_test, _, _ = env.step(a_test, a_nature_env, a_test)
-                    next_o_sample, r_test, _, _ = env.step(a_test, a_nature_env, agent_pol)
+                    # Compute opponent agent's actions for current env worlds state
+                    a_test = agent_pol.act_test(torch_o)
+                    # Compute reward of opponent agent_pol for the current world state
+                    _, r_test, _, _ = env.step(a_test, a_nature_env, agent_pol)
                     test_r_list[trial] = r_test.sum()
                 endt = time.time()
 
@@ -894,12 +693,15 @@ class NatureOracle:
                 # env.current_full_state = next_o
                 env.current_count_state = next_o
 
-
+                # Compute mean opponent reward
                 r_test_mean = test_r_list.mean()
 
-
+                # Reward for optimal whittle policy
                 actual_r_agent = r_agent.sum()
+                # Compute regret. This is nature's reward
                 actual_r_nature = actual_r_agent - r_test_mean
+                
+                # Compute lambda adjusted nature reward
                 
                 # cost_vec = np.zeros(env.N)
                 # for i in range(env.N):
@@ -910,7 +712,7 @@ class NatureOracle:
                 # lamb_adjusted_r_agent = actual_r_agent - current_lamb*cost_vec.sum()
 
                 # # but store lambda adjusted for nature oracle...
-                # FIX
+
                 lamb_adjusted_r_nature = actual_r_nature - current_lamb*env.B
                 ## TODO: Use Current lambda from wh policy, replace cost vec with budget
                 # print('lambda adjusted r nature ', lamb_adjusted_r_nature, actual_r_nature, actual_r_agent, r_test_mean)
@@ -923,12 +725,8 @@ class NatureOracle:
                 ep_len += 1
 
                 # save and log
-                # buf.store(o, cost_vec, current_lamb, a_agent, a_nature, r_agent, lamb_adjusted_r_nature, v_agent, v_nature,
-                #     q_agent, q_nature, logp_agent, logp_nature)
-                # Review: is it okay to pass r_agent as r_nature??
-                # buf.store(o, a_agent_list, a_nature, r_agent.sum(), v_nature, q_nature, logp_nature)
+
                 buf.store(o, a_agent_list, a_nature, lamb_adjusted_r_nature, v_nature, q_nature, logp_nature)
-                # logger.store(VVals_agent=v_agent)
                 logger.store(VVals_nature=v_nature)
 
 
@@ -940,7 +738,7 @@ class NatureOracle:
                 terminal = d or timeout
                 epoch_ended = t==local_steps_per_epoch-1
 
-
+                # Some extra buf adjustment at episode end
                 if terminal or epoch_ended:
                     FINAL_ROLLOUT_LENGTH = 50
                     if epoch_ended and not(terminal):
@@ -948,12 +746,6 @@ class NatureOracle:
                         pass
                     # if trajectory didn't reach terminal state, bootstrap value target
                     if timeout or epoch_ended:
-                        # print('lam',current_lamb,'obs:',o,'a_agent',a_agent,'v_agent:',v_agent,
-                        #      'logp_agent:',logp_agent,'a_nature',a_nature,'v_nature:',v_nature,
-                        #      'logp_nature:',logp_nature)
-                        # _, v_agent, _, _, _, v_nature, _, _, _ = ac.step(torch.as_tensor(o, dtype=torch.float32), current_lamb)
-                        # print('obs:',o,'a_agent',a_agent_list,'a_nature',a_nature,'v_nature:',v_nature,
-                        #      'logp_nature:',logp_nature)
                         _, v_nature, _, _ = ac.step(torch.as_tensor(o, dtype=torch.float32), a_agent_list = np.zeros(self.N,dtype=int))
 
                         # rollout costs for an imagined 50 steps...
@@ -988,9 +780,9 @@ class NatureOracle:
             if (epoch % save_freq == 0) or (epoch == epochs-1):
                 logger.save_state({'env': env}, None)
 
-            # Perform MA_RMABPPO update!
+            # Perform MA_RMABPPO nature oracle's update!
             head_entropy_coeff = head_entropy_coeff_schedule[epoch]
-
+            # Call update. Will internally use data from buf
             update(epoch, head_entropy_coeff)
 
 
