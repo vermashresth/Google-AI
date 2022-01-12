@@ -253,8 +253,8 @@ class WhittlePolicy():
         return actions
     
     def __str__(self):
-        return f'Whittle Policy {np.round(self.whittle_indices.flatten(), 1)}-{np.argsort(self.whittle_indices.flatten())}'
-
-    def __repr__(self):
-        return f'Whittle Policy {np.round(self.whittle_indices.flatten(), 1)}-{np.argsort(self.whittle_indices.flatten())}'
-    
+        # Give a unique name to whittle policy using ranking of whittle indices
+        # return f'Whittle Policy {np.round(self.whittle_indices.flatten(), 1)}-{np.argsort(self.whittle_indices.flatten())}'
+        top_3_rank = [str(i) for i in np.argsort(self.whittle_indices.flatten())[:3]]
+        str_top_3_rank = '_'.join(top_3_rank)
+        return 'Whittle Policy '+str_top_3_rank

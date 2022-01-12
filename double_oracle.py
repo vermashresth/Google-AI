@@ -166,28 +166,28 @@ class DoubleOracle:
             # self.update_payoffs_agent(agent_br)
             nature_br = self.nature_oracle.best_response(self.agent_strategies, agent_eq, add_to_seed)
             # self.update_payoffs_nature(nature_br)
-            print('#'*10)
+            print('#'*20)
             print('Agent BR: ', agent_br)
             print('Nature BR: ', nature_br)
-            print('#'*10)
+            print('#'*20)
+            print()
 
             add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
             self.update_payoffs(nature_br, agent_br, add_to_seed)
-            print('*'*100)
-            print(self.fairness)
-            # print(self.payoffs)
+
 
             # find equilibrium of subgame
+            print('\nFinding Equilibrium \n')
             agent_eq, nature_eq = self.find_equilibrium()
-            print('#'*100, '\n\n', 'Equilibriums')
-            print(agent_eq, nature_eq)
-            print('#'*100, '\n\n', 'Equilibriums')
-
+            print()
+            print('#'*20)
             print('agent equilibrium    ', np.round(agent_eq, 3))
             print('nature equilibrium ', np.round(nature_eq, 3))
+            print('#'*20)
+            print()
 
             max_regret_game = np.array(self.payoffs) - np.array(self.payoffs).max(axis=0)
-            print('!!!!! ', n_epochs, 'payoffs are', get_payoff(max_regret_game, agent_eq, nature_eq))
+            # print('!!!!! ', n_epochs, 'payoffs are', get_payoff(max_regret_game, agent_eq, nature_eq))
 
             if n_epochs >= self.max_epochs_double_oracle: 
                 converged = True
@@ -603,11 +603,12 @@ if __name__ == '__main__':
     #     print('   ', np.round(a, 3))
 
     print()
-    print('payoffs (regret)', np.array(do.payoffs).shape)
-    print('!'*100, '\n Fairness: ', np.array(do.fairness))
+    print('payoffs (regret)')
     regret = np.array(do.payoffs) - np.array(do.payoffs).max(axis=0)
     for p in regret:
         print('   ', np.round(p, 2))
+    print('Fairness Matrix')
+    print(np.array(do.fairness))
 
 
     ###########
@@ -918,10 +919,6 @@ if __name__ == '__main__':
     print('regrets', tick_names)
     print(np.round(bar_vals, 3))
 
-    print('$'*100)
-    print(do.fairness)
-    print(do_fairness, do_fairness_no_new_nature, baseline_middle_rl_fairness, baseline_random_agent_fairness)
-    print('$'*100)
     if args.cannon:
         import matplotlib
         matplotlib.use('pdf')

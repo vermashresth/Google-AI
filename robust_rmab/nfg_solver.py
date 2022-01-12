@@ -24,9 +24,7 @@ def solve_game(payoffs):
 
     # Lemke-Howson couldn't find equilibrium OR
     # Lemke-Howson return error - game may be degenerate. try other approaches
-    print(equilibrium)
-    print(equilibrium[0])
-    print(equilibrium[1])
+
     if equilibrium is None or np.isnan(equilibrium[0]).any() or np.isnan(equilibrium[1]).any() or (equilibrium[0].shape != (payoffs.shape[0],) or equilibrium[1].shape != (payoffs.shape[1],)):
         # try other
         print('\n\n\n\n\nuh oh! degenerate solution')
@@ -96,7 +94,7 @@ def solve_minimax_regret_with_regret_array(regret_array):
 
 def get_payoff(payoffs, agent_eq, nature_eq):
     """ given player mixed strategies, return expected payoff """
-    print('^^'*100, 'getting payoff')
+    print('^'*20, 'getting payoff')
     print(payoffs.shape)
     print(payoffs, agent_eq, nature_eq)
     game = nash.Game(payoffs)
