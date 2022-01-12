@@ -976,53 +976,42 @@ class ARMMANRobustEnv(gym.Env):
         S = 2
         A = 2
 
-        ## REVIEW: Load these from a pickle file
-        # self.cluster_mapping = np.array([0,0,0,0,0,0,
-        #                         1,1,1,1,1,1,
-        #                         2,2,2,2,2,2])
-        # self.n_clusters = 3
-
-        ##Review: Can this hyperparameter be removed. Also make it dynamic
-        # self.max_cluster_size = 10 # Equal to max cluster size
-
-        # self.PARAMETER_RANGES = self.get_parameter_ranges(self.n_clusters)
-
+        # Setting these parameters from global loaded pickled file
+        # TODO: make this more clean
         self.n_clusters, self.cluster_mapping, self.max_cluster_size, self.PARAMETER_RANGES =\
             info_dict['n_clusters'], info_dict['cluster_mapping'], info_dict['max_cluster_size'], info_dict['parameter_ranges']
  
         
         assert self.n_clusters*S == N
+        # Here N is not number of arms but size of problem. It is equal to number of clusters times number of states
         self.N = N
         self.n_arms = len(self.cluster_mapping)
 
-        
+        # Arm observation space is state at arm level
         self.arm_observation_space = np.arange(S)
-        ## Review: Note that max_cluster_size could be one of the states
+        # This observation space is at cluster-state level. Since it contains counts of beneficiries
+        # its maximum value is size of largest cluster
         self.observation_space = np.arange(self.max_cluster_size+1)
         self.action_space = np.arange(A)
         self.observation_dimension = 1
         self.action_dimension = 1
 
-        ## FIXED: If N is already n_clusters * n_states, then why n_states is twice
+        ## Nature outputs transition probabilities of shape n_clusters x n_states x n_actions
+        # N is already n_clusters * n_states, so we can write it as below
         self.action_dim_nature = N*A
-        # self.REWARD_BOUND = REWARD_BOUND
-        # self.reward_range = (0, REWARD_BOUND)
+
         self.S = S
         self.A = A
         self.B = B
-        # self.actual_B = 2*B
-        # self.cluster_B = 3
+
         self.init_seed = seed
-        # self.percent_A = 0.2
-        # self.percent_B = 0.2
 
-        # self.current_full_state = np.zeros(N)
-        # self.current_count_state = np.zeros(N)
         self.random_stream = np.random.RandomState()
+    
+        # Obtain placeholder Transition Probablity matrix, Reward function, Cost function
+        self.T, self.R, self.C = self.get_experiment(self.n_clusters)
 
-        
-        self.T, self.R, self.C = self.get_experiment(N)
-        # make sure to set this whenever environment is created, but do it outside so it always the same
+        # No longer use this parameter
         self.sampled_parameter_ranges = None 
 
 
@@ -1034,80 +1023,13 @@ class ARMMANRobustEnv(gym.Env):
 
 
 
-    # new version has one range per state, per action
-    # We will sample ranges from within these to get some extra randomness
-    def get_parameter_ranges(self, n_clusters):
-        # Review: Load these from pickle file
-        # Review: should these be at cluster level or every level
-        # A - 10 in A
-        rangeA = [
-                    [
-                        [0.4, 0.8],
-                        [0.2, 0.9]
-                    ],
-                    [
-                        [0.6, 1.0], # p deteriorate in absence of intervention
-                        [0.5, 0.9], # p improve on intervention
-                    ]
-
-                ]
-
-
-        # B - 10 in B
-        rangeB = [
-                    [
-                        [0.35, 0.85], # p deteriorate in absence of intervention
-                        [0.15, 0.65], # p improve on intervention
-                    ],
-                    [
-                        [0.3, 0.8],
-                        [0.4, 0.9]
-                    ]
-
-                ]
-
-        # C - 30 in C
-        rangeC = [
-                    [
-                        [0.2, 0.7],
-                        [0.1, 0.8]
-                    ],
-                    [
-                        [0.25, 0.55],
-                        [0.45, 0.65]
-                    ]
-
-                ]
-
-        
-
-        num_A = int(n_clusters*self.percent_A)
-        num_B = int(n_clusters*self.percent_B)
-        num_C = n_clusters  - num_A - num_B
-
-        parameter_ranges = []
-        for i in range(num_A):
-            parameter_ranges.append(rangeA)
-        for i in range(num_B):
-            parameter_ranges.append(rangeB)
-        for i in range(num_C):
-            parameter_ranges.append(rangeC)
-
-        # self.parameter_ranges = np.array(parameter_ranges)
-
-        return np.array(parameter_ranges)
-
-
     def sample_parameter_ranges(self):
-
+        # Just use param ranges loaded from from pickle file
         return np.copy(self.PARAMETER_RANGES)
 
     def get_experiment(self, N):
         
-        # States go S, P, L
-        # 
-
-        # A - 10 in A
+        # All params are in 0 to -1. means nature has to control all params
         t = np.array([[ [0.0, -1], 
                         [0.0, -1]],
 
@@ -1139,8 +1061,7 @@ class ARMMANRobustEnv(gym.Env):
         return actions
 
 
-    # a_agent should correspond to an action respresented in the transition matrix
-    # a_nature should be a probability in the range specified by self.parameter_ranges
+    # Deprecated step function that acted on individual arm level
     def stepIndv(self, a_agent, a_nature):
 
         for arm_i in range(a_nature.shape[0]):
@@ -1187,107 +1108,95 @@ class ARMMANRobustEnv(gym.Env):
         return next_full_state, rewards, False, None
 
     def step(self, a_agent, a_nature, agent_pol=None, debug=False): # Step Cluster to Indv
-        # self.n_arms: number of actual arms
-        # self.N: number of clusters x 2 states
-        # self.T: self.N x state x action x state level Transition probabilities
-        # self.cluster_T : self.C x state x action x state
-        # a_agent: self.N sized vector, boolean for every cluster x state
-        # a_nature : self.N x state x action
-        # next_full_state, current_full_state: self.N sized: should store counts here
-        # next_arms_state, current_arms_state: self.n_arms sized array
-        # self.arms_T: self.n_arms x state x action x state level Transition probabilities
-        # cluster_mapping: self.n_arms sized array 
-        # self.B : select B out of cluster x S grps
-        # self.actual B: select actualB out of n_arms
-
-        # N = 6, 3 clusters, 2 states
-        # n_arms = 18
-
+        '''
+        This function does the crucial step of mapping nature and env's actions from cluster-state level to arm level
         
-        # for arm_i in range(a_nature.shape[0]):
-        #     for arm_a in range(a_nature.shape[1]):
+        `a_nature`: nature's actions
+        We assume that a_nature is always at cluster-state level with shape self.n_clusters x state x action
 
-        #         param = a_nature[arm_i, arm_a]
-        #         # arm_state = int(self.current_full_state[arm_i])
-        #         # if param < self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 0]:
-        #         
-        #         if param < self.sampled_parameter_ranges[arm_i, arm_a%2, arm_a//2, 0]:
+        `a_agent`: agent's actions
+        When a_agent is provided, its meaning is defined by the value of agent_pol
+        Case 1. agent_pol is a whittle index object
+            In this case, a_agent is ignored, and we obtain arm level actions using whittle policy's act_test_cluster_to_indiv
+            is passed can either be fully specified at arm level. 
+            This will be a vector of length self.n_arms having boolean 0 or 1 values for the two actions
+        Case 2. agent_pol is not a whittle index policy object or is None and a_agent is a vector of length self.n_arms
+            In this case, the agent policy is a random policy. a_agent is already at arm level, we need not do any mapping.
+        Case 3. agent_pol is not a whittle index policy object or is None and a_agent is a vector of length self.N containing all zeros
+            In this case, the agent policy is a pessimist policy. The mapping is trivial and we return a vector of length self.n_arms
+            containing all zeros
+        Case 4. Not in any of the above cased. We shouldn't encountr this case. 
+            Here the mapping is not trivial and involves distributing total budget proportionally (wrt to cluster size) to some/all
+            clusters. We also need a hyperparameter controlling how many clusters we want to split budget in.
 
-        #             print("Warning! nature action below allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_state, arm_a]))
-        #             print("Setting to lower bound of range...")
-        #             print('arm state',arm_state)
-        #             # param = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 0]
-        #             param = self.sampled_parameter_ranges[arm_i, arm_a%2, arm_a//2, 0]
-        #         # elif param > self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 1]:
-        #         elif param > self.sampled_parameter_ranges[arm_i, arm_a%2, arm_a//2, 1]:
-        #             print("Warning! nature action above allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_state, arm_a]))
-        #             print("Setting to upper bound of range...")
-        #             print('arm state',arm_state)
-        #             # param = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 1]
-        #             param = self.sampled_parameter_ranges[arm_i, arm_a%2, arm_a//2, 1]
 
-        #         # self.T[arm_i,arm_state,arm_a,0] = param
-        #         # self.T[arm_i,arm_state,arm_a,1] = 1-param
 
-        #         self.T[arm_i,arm_a%2, arm_a//2,0] = param
-        #         self.T[arm_i,arm_a%2, arm_a//2,1] = 1-param
-        s = time.time()
+        When a_agent is specified and 
+        For 
+        self.n_arms: number of actual arms
+        self.N: number of clusters x 2 states
+        self.T: self.N x state x action x state level Transition probabilities
+        self.cluster_T : self.C x state x action x state
+        a_agent: self.N sized vector, boolean for every cluster x state
+        a_nature : self.N x state x action
+        next_full_state, current_full_state: self.N sized: should store counts here
+        next_arms_state, current_arms_state: self.n_arms sized array
+        self.arms_T: self.n_arms x state x action x state level Transition probabilities
+        cluster_mapping: self.n_arms sized array 
+        self.B : select B out of cluster x S grps
+        self.actual B: select actualB out of n_arms
+        '''
+        # For all transition parameters outputed by nature, first bound them within allowed param range
         for arm_i in range(a_nature.shape[0]):
             for arm_s in range(a_nature.shape[1]):
                 for arm_a in range(a_nature.shape[2]):
-
-                    param = a_nature[arm_i, arm_s, arm_a]
-                    # arm_state = int(self.current_full_state[arm_i])
-                    # if param < self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 0]:
                     
-                    if param < self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 0]:
+                    param = a_nature[arm_i, arm_s, arm_a]
 
+                    if param < self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 0]:
                         print("Warning! nature action below allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_s, arm_a]))
                         print("Setting to lower bound of range...")
-                        # param = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 0]
                         param = self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 0]
-                    # elif param > self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 1]:
+
                     elif param > self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 1]:
                         print("Warning! nature action above allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_s, arm_a]))
                         print("Setting to upper bound of range...")
-                        # param = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 1]
                         param = self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 1]
-
-                    # self.T[arm_i,arm_state,arm_a,0] = param
-                    # self.T[arm_i,arm_state,arm_a,1] = 1-param
-
+                    # Set env's current transitions to nature bounded actions
                     self.T[arm_i,arm_s, arm_a,0] = param
                     self.T[arm_i,arm_s, arm_a,1] = 1-param
-        # print('nature param', time.time()-s)
-        # self.cluster_T = (self.T[::self.S] + self.T[1::self.S])/2
+
+        # cluster_T stores TP at cluster-state level
         self.cluster_T = np.copy(self.T)
+        # Map TP to arms using cluster mapping and current arm state
         self.arms_T = self.cluster_T[self.cluster_mapping]
 
-        # self.cluster_R = (self.R[::self.S] + self.R[1::self.S])/2
+        # cluster_R stores reward function at cluster-state level
         self.cluster_R = np.copy(self.R)
+        # Map R from cluster-state to arms
         self.arms_R = self.cluster_R[self.cluster_mapping]
-        # print(agent_pol)
+
+        # Note that above step is not strictly needed because reward function is same for all clusters
+
         s = time.time()
         if str(agent_pol).startswith('Whittle Policy'):
-            # a_agent_arms = agent_pol.act_test_cluster_to_indiv(self.cluster_mapping,
-            #                                                    self.current_arms_state,
-            #                                                    self.actual_B)
+            # Case 1, Whittle Policy
             a_agent_arms = agent_pol.act_test_cluster_to_indiv(self.cluster_mapping,
                                                                self.current_arms_state,
                                                                self.B)
             self.current_lamb = agent_pol.current_lamb
-            # print('whittle policy')
+
         else:
             if len(a_agent)==self.n_arms:
-                # print('random agent case')
+                # Case 2, Random Policy
                 a_agent_arms = a_agent[::]
             elif np.array_equal(a_agent, np.zeros(self.N)):
-                # print('pessimist agent case')
+                # Case 3, Pessimist Policy
                 a_agent_arms = np.zeros(self.n_arms)
             else:
-                print(' shouldnt be here')
-                ## Review: Simplify this. This code block would only be called for pessimistic agent baseline
-                # print('cluster wise actions:', a_agent)
+                # Case 4. Current Code shouldn't enter this block
+                raise NotImplementedError
+                ## Review: Simplify this. 
                 pick_dict = {}
                 total_pick_size = 0
                 for idx in range(self.N):
@@ -1296,7 +1205,7 @@ class ARMMANRobustEnv(gym.Env):
                         pick_count = self.current_count_state[idx]
                         pick_dict[(cluster_i, state_i)] = pick_count
                         total_pick_size += pick_count
-                # print('pick dict', pick_dict)
+
                 a_agent_arms = np.zeros(self.n_arms)
                 if total_pick_size!=0:
                     for cluster_i, state_i in pick_dict.keys():
@@ -1305,38 +1214,31 @@ class ARMMANRobustEnv(gym.Env):
 
                         subset_idx = np.arange(self.n_arms)[(self.cluster_mapping==cluster_i) &
                                                             (self.current_arms_state==state_i)]
-                        # print('inside')
-                        # print('cl, st', cluster_i, state_i)
-                        # print(to_pick_count)
-                        # print((self.cluster_mapping==cluster_i))
-                        # print((self.current_arms_state==state_i))
-                        # print(self.cluster_mapping)
-                        # print(self.current_arms_state)
-                        # print(subset_idx)
                         if len(subset_idx)==0:
                             continue
                         chosen_idx = np.random.choice(subset_idx, min(len(subset_idx), to_pick_count))
                         a_agent_arms[chosen_idx] = 1
-            # print('chosen arms :', a_agent_arms.sum())
-            self.current_lamb = 0
-        # print('getting agent actioins', time.time()-s)
 
-        s = time.time()
-        ###### Get next state
-        next_arms_state = np.zeros(self.n_arms, dtype=int)
-        rewards = np.zeros(self.n_arms)
+            self.current_lamb = 0
+
+        # Placeholder for storing cluster-state level actions and rewards
+        # These are needed for training nature oracle
         clustered_rew = np.zeros(self.N)
         clustered_actions = np.zeros(self.N)
         
         
         def vec_multinomial(prob_matrix):
+            # Fast vectorized multinomial transition
             s = prob_matrix.cumsum(axis=1)
             r = self.random_stream.rand(prob_matrix.shape[0])
             k = (s < np.expand_dims(r, 1)).sum(axis=1)
             return k
 
+        # Get next state
         next_arms_state = vec_multinomial(self.arms_T[np.arange(self.n_arms), self.current_arms_state, a_agent_arms.astype(int), :])
         rewards = self.arms_R[np.arange(self.n_arms), next_arms_state]
+        
+        # Compute aggregated rewards and actions at cluster level
         data_df = pd.DataFrame({'cluster_mapping':self.cluster_mapping,
                                 'curr_state':self.current_arms_state,
                                 'rewards':rewards,
@@ -1346,27 +1248,16 @@ class ARMMANRobustEnv(gym.Env):
         act_grouped = data_df.groupby('idx')['a_agent'].sum()
         clustered_rew[rew_grouped.index] = rew_grouped.values
         clustered_actions[act_grouped.index] = act_grouped.values
-        # print(a_agent_arms)
-        # print(clustered_actions)
-        # print(clustered_rew)
-        # for i in range(self.n_arms):
-        #     current_arm_state=int(self.current_arms_state[i])
-        #     # next_arm_state=np.argmax(self.random_stream.multinomial(1, self.arms_T[i, current_arm_state, int(a_agent_arms[i]), :]))
-        #     next_arm_state=next_arms_state[i]
-        #     rewards[i] = self.arms_R[i, next_arm_state]
-        #     clustered_rew[self.cluster_mapping[i]*self.S + current_arm_state] += rewards[i]
-        #     clustered_actions[self.cluster_mapping[i]*self.S + current_arm_state] += a_agent_arms[i]
-        
 
-
-        # print('broadcasting ', time.time()-s)
+        # Current arms state is state at arm level
         self.current_arms_state = next_arms_state
+        # Current count state is count of every state in every cluster
+        # Nature oracle uses this state space
         self.current_count_state = self.get_count_state()
         self.current_count_state = self.current_count_state.reshape(self.N, self.observation_dimension)
         self.clustered_actions = clustered_actions
         
-        # print('agent actions: ', a_agent_arms)
-        # print('obs', self.current_count_state)
+        # If we want a stateless environmennt, we can just zero out count state
         #Hack zero out count state
         self.current_count_state = np.zeros(self.current_count_state.shape)
         return self.current_count_state, clustered_rew, False, a_agent_arms
@@ -1466,6 +1357,8 @@ class ARMMANRobustEnv(gym.Env):
         return self.reset()
 
     def get_count_state(self):
+        # This function gives count of beneficiries in every state for eveyr cluster
+        # returns a state of size self.n_clusters x self.n_states
         count_state = np.zeros(self.N)
         for arm_i, state in enumerate(self.current_arms_state):
             cluster = self.cluster_mapping[arm_i]
@@ -1478,6 +1371,7 @@ class ARMMANRobustEnv(gym.Env):
         self.current_arms_state = self.random_stream.choice(self.arm_observation_space, self.n_arms)
         # self.current_full_state = self.random_stream.choice(self.observation_space, self.N)
         self.current_count_state = self.get_count_state()
+        # If we want a stateless env, zero out state counts
         #hack
         self.current_count_state = np.zeros(self.current_count_state.shape)
         return self.current_count_state.reshape(self.N, self.observation_dimension)
