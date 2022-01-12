@@ -16,7 +16,7 @@ import robust_rmab.algos.rmabppo.rmabppo_core as core
 from robust_rmab.utils.logx import EpochLogger
 from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
 from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
-from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv, ARMMANEnv
+#from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv, ARMMANEnv
 from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
 
 from robust_rmab.algos.whittle.whittle_policy import WhittlePolicy
@@ -188,19 +188,19 @@ class AgentOracle:
         if data == 'random':
             self.env_fn = lambda : RandomBanditEnv(N,S,A,B,seed,REWARD_BOUND)
 
-        if data == 'random_reset':
+        elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,B,seed,REWARD_BOUND)
 
-        if data == 'armman':
+        elif data == 'armman':
             self.env_fn = lambda : ARMMANRobustEnv(N,B,seed)
 
-        if data == 'circulant':
+        elif data == 'circulant':
             self.env_fn = lambda : CirculantDynamicsEnv(N,B,seed)
 
-        if data == 'counterexample':
+        elif data == 'counterexample':
             self.env_fn = lambda : CounterExampleRobustEnv(N,B,seed)
 
-        if data == 'sis':
+        elif data == 'sis':
             self.env_fn = lambda : SISRobustEnv(N,B,pop_size,seed)
 
         self.actor_critic=core.MLPActorCriticRMAB
@@ -415,7 +415,7 @@ class AgentOracle:
             # print('entropy',entropy_coeff)
 
             # Train policy with multiple steps of gradient descent
-            for i in range(train_pi_iters):
+            for _ in range(train_pi_iters):
                 for i in range(env.N):
                     pi_optimizers[i].zero_grad()
                 loss_pi, pi_info = compute_loss_pi(data, entropy_coeff)
@@ -484,6 +484,7 @@ class AgentOracle:
 
 
         # Sample a nature policy
+        # TODO: this is only sampling one strategy. 
         nature_eq = np.array(nature_eq)
         nature_eq[nature_eq < 0] = 0
         nature_eq = nature_eq / nature_eq.sum()
@@ -509,13 +510,14 @@ class AgentOracle:
 
             # Resample nature policy every time we update lambda
             if epoch%lamb_update_freq == 0 and epoch > 0:
-                nature_pol = np.random.choice(nature_strats,p=nature_eq)
+                nature_pol = np.random.choice(nature_strats, p=nature_eq)
             
             torch_o = torch.as_tensor(o, dtype=torch.float32)
             a_nature = nature_pol.get_nature_action(torch_o)
 
             a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
             print('nature transitions:', a_nature_env)
+
             # Whittle policy action
             wh_policy.note_env(env)
             wh_policy.learn(a_nature_env)
@@ -635,14 +637,14 @@ class AgentOracle:
             # print("epoch",epoch)
             a_epoch_history = []
             for t in range(steps_per_epoch):
-                torch_o = torch.as_tensor(o, dtype=torch.float32)
+                torch_o  = torch.as_tensor(o, dtype=torch.float32)
                 a_agent  = agent_pol.act_test(torch_o)
                 a_nature = nature_pol.get_nature_action(torch_o)
                 a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
                 
                 
-                next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol,
-                                                     debug=epoch==0 and t==0)
+                next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol
+                                                      , debug=(epoch==0 and t==0))
 
                 # next_o, r, d, _ = env.step(a_agent, a_nature_env)
                 a_epoch_history.append(a_agent_arms)
@@ -680,7 +682,8 @@ class AgentOracle:
         return rewards, hhi
     
     def calculate_fairness(self, a_history, epochs, steps_per_epoch, action_size):
-        print('caclualating Fairness')
+        """ fairness determined by percentage pulls of each arm per epoch """
+        print('calculating Fairness')
         a_history = np.array(a_history)
         assert a_history.shape==(epochs, steps_per_epoch, action_size), a_history.shape
 
@@ -689,6 +692,7 @@ class AgentOracle:
         pull_proportion_per_epoch = pulls_per_epoch/budget
         hhi_per_epoch = np.sum(np.square(pull_proportion_per_epoch), axis=1) 
         mean_hhi = np.mean(hhi_per_epoch, axis=0)
+        print(f'  HHI: {mean_hhi}')
         
         return mean_hhi
     

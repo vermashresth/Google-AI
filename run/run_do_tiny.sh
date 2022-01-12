@@ -1,4 +1,5 @@
-python3 ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
+cd ..
+python ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
 --exp_name ${5} \
 --home_dir ${1} \
 -s ${2} \
