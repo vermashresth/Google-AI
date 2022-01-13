@@ -1281,57 +1281,26 @@ class ARMMANRobustEnv(gym.Env):
         a_nature = a_nature_flat.reshape(self.n_clusters, self.S, self.A)    
 
         a_nature_bounded = np.zeros(a_nature.shape)
-        for arm_i in range(a_nature.shape[0]):
-            for arm_s in range(a_nature.shape[1]):
-                for arm_a in range(a_nature.shape[2]):
-                    param = a_nature[arm_i,arm_s,arm_a]
+        for cluster_idx in range(a_nature.shape[0]):
+            for state in range(a_nature.shape[1]):
+                for action in range(a_nature.shape[2]):
+                    param = a_nature[cluster_idx,state,action]
 
                     # arm_state = int(state[arm_i])
                     # lb = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 0]
                     # ub = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 1]
 
-                    lb = self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 0]
-                    ub = self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 1]
+                    lb = self.sampled_parameter_ranges[cluster_idx, state, action, 0]
+                    ub = self.sampled_parameter_ranges[cluster_idx, state, action, 1]
 
                     
                     # print('range',lb, ub)
                     # print('param in',param)
                     # print('arm state',arm_state)
 
-                    a_nature_bounded[arm_i,arm_s,arm_a] = ((self.tanh(torch.as_tensor(param, dtype=torch.float32))+1)/2)*(ub - lb) + lb
+                    a_nature_bounded[cluster_idx,state,action] = ((self.tanh(torch.as_tensor(param, dtype=torch.float32))+1)/2)*(ub - lb) + lb
                     # print('param out', a_nature_bounded[arm_i,arm_a])
                     # print()
-
-        if not reshape:
-            a_nature_bounded = a_nature_bounded.reshape(*a_nature_flat.shape)
-
-        return a_nature_bounded
-
-    def bound_nature_actions_old(self, a_nature_flat, state=None, reshape=True):
-        # num arms by num actions
-        a_nature = a_nature_flat.reshape(self.N, self.T.shape[1]*self.T.shape[2])    
-
-        a_nature_bounded = np.zeros(a_nature.shape)
-        for arm_i in range(a_nature.shape[0]):
-            for arm_a in range(a_nature.shape[1]):
-                
-                param = a_nature[arm_i,arm_a]
-
-                # arm_state = int(state[arm_i])
-                # lb = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 0]
-                # ub = self.sampled_parameter_ranges[arm_i, arm_state, arm_a, 1]
-
-                lb = self.sampled_parameter_ranges[arm_i, arm_a%2, arm_a//2, 0]
-                ub = self.sampled_parameter_ranges[arm_i, arm_a%2, arm_a//2, 1]
-
-                
-                # print('range',lb, ub)
-                # print('param in',param)
-                # print('arm state',arm_state)
-
-                a_nature_bounded[arm_i,arm_a] = ((self.tanh(torch.as_tensor(param, dtype=torch.float32))+1)/2)*(ub - lb) + lb
-                # print('param out', a_nature_bounded[arm_i,arm_a])
-                # print()
 
         if not reshape:
             a_nature_bounded = a_nature_bounded.reshape(*a_nature_flat.shape)
