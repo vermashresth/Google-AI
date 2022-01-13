@@ -1133,24 +1133,24 @@ class ARMMANRobustEnv(gym.Env):
 
         '''
         # For all transition parameters outputed by nature, first bound them within allowed param range
-        for arm_i in range(a_nature.shape[0]):
-            for arm_s in range(a_nature.shape[1]):
-                for arm_a in range(a_nature.shape[2]):
+        for cluster_idx in range(a_nature.shape[0]):
+            for state in range(a_nature.shape[1]):
+                for action in range(a_nature.shape[2]):
                     
-                    param = a_nature[arm_i, arm_s, arm_a]
+                    param = a_nature[cluster_idx, state, action]
 
-                    if param < self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 0]:
+                    if param < self.sampled_parameter_ranges[cluster_idx, state, action, 0]:
                         print("Warning! nature action below allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_s, arm_a]))
                         print("Setting to lower bound of range...")
-                        param = self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 0]
+                        param = self.sampled_parameter_ranges[cluster_idx, state, action, 0]
 
-                    elif param > self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 1]:
+                    elif param > self.sampled_parameter_ranges[cluster_idx, state, action, 1]:
                         print("Warning! nature action above allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_s, arm_a]))
                         print("Setting to upper bound of range...")
-                        param = self.sampled_parameter_ranges[arm_i, arm_s, arm_a, 1]
+                        param = self.sampled_parameter_ranges[cluster_idx, state, action, 1]
                     # Set env's current transitions to nature bounded actions
-                    self.T[arm_i,arm_s, arm_a,0] = param
-                    self.T[arm_i,arm_s, arm_a,1] = 1-param
+                    self.T[cluster_idx,state, action,0] = param
+                    self.T[cluster_idx,state, action,1] = 1-param
 
         # cluster_T stores TP at cluster-state level
         self.cluster_T = np.copy(self.T)
