@@ -12,7 +12,6 @@ import numpy as np
 import torch
 from torch.optim import Adam, SGD
 import time
-import robust_rmab.algos.rmabppo.rmabppo_core as core
 from robust_rmab.utils.logx import EpochLogger
 from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
 from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
@@ -20,146 +19,6 @@ from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, 
 from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
 
 from robust_rmab.algos.whittle.whittle_policy import WhittlePolicy
-
-
-class RMABPPO_Buffer:
-    """
-    A buffer for storing trajectories experienced by a RMABPPO agent interacting
-    with the environment, and using Generalized Advantage Estimation (GAE-Lambda)
-    for calculating the advantages of state-action pairs.
-    """
-
-    def __init__(self, obs_dim, act_dim, N, act_type, size, one_hot_encode=True, gamma=0.99, lam_OTHER=0.95):
-        self.N = N
-        self.obs_dim = obs_dim
-
-        self.one_hot_encode = one_hot_encode
-
-        self.obs_buf = np.zeros(core.combined_shape(size, N), dtype=np.float32)
-        self.ohs_buf = np.zeros(core.combined_shape(size, (N, obs_dim)), dtype=np.float32)
-        
-        self.act_buf = np.zeros((size, N), dtype=np.float32)
-        self.oha_buf = np.zeros(core.combined_shape(size, (N, act_dim)), dtype=np.float32)
-
-        self.adv_buf = np.zeros((size,N), dtype=np.float32)
-        self.rew_buf = np.zeros((size,N), dtype=np.float32)
-        self.cost_buf = np.zeros((size,N), dtype=np.float32)
-        self.ret_buf = np.zeros((size,N), dtype=np.float32)
-        self.val_buf = np.zeros((size,N), dtype=np.float32)
-        self.q_buf   = np.zeros((size,N), dtype=np.float32)
-        self.logp_buf = np.zeros((size,N), dtype=np.float32)
-        self.cdcost_buf = np.zeros(size, dtype=np.float32)
-        self.lamb_buf = np.zeros(size, dtype=np.float32)
-
-        self.gamma, self.lam_OTHER = gamma, lam_OTHER
-        self.ptr, self.path_start_idx, self.max_size = 0, 0, size
-        self.act_type = act_type
-        self.act_dim = act_dim
-
-
-    def store(self, obs, act, rew, cost, val, q, lamb, logp):
-        """
-        Append one timestep of agent-environment interaction to the buffer.
-        """
-        assert self.ptr < self.max_size     # buffer has to have room so you can store
-        self.obs_buf[self.ptr] = obs
-        ohs = np.zeros((self.N, self.obs_dim))
-        if self.one_hot_encode:
-            for i in range(self.N):
-                ohs[i, int(obs[i])] = 1
-        self.ohs_buf[self.ptr] = ohs
-
-
-        self.act_buf[self.ptr] = act
-        oha = np.zeros((self.N, self.act_dim))
-        for i in range(self.N):
-            oha[i, int(act[i])] = 1
-        self.oha_buf[self.ptr] = oha
-
-        self.rew_buf[self.ptr] = rew
-        self.cost_buf[self.ptr] = cost
-        self.val_buf[self.ptr] = val
-        self.q_buf[self.ptr]   = q
-        self.lamb_buf[self.ptr] = lamb
-        self.logp_buf[self.ptr] = logp
-        self.ptr += 1
-
-
-    # TODO: implement last costs rollout if we create a training procedure that 
-    # uses every step as a sample to update lambda
-    # for now, we only use the first sample of epoch to update lambda, so "future" costs don't matter much
-    def finish_path(self, last_vals=0, last_costs=0):
-        """
-        Call this at the end of a trajectory, or when one gets cut off
-        by an epoch ending. This looks back in the buffer to where the
-        trajectory started, and uses rewards and value estimates from
-        the whole trajectory to compute advantage estimates with GAE-Lambda,
-        as well as compute the rewards-to-go for each state, to use as
-        the targets for the value function.
-
-        The "last_val" argument should be 0 if the trajectory ended
-        because the agent reached a terminal state (died), and otherwise
-        should be V(s_T), the value function estimated for the last state.
-        This allows us to bootstrap the reward-to-go calculation to account
-        for timesteps beyond the arbitrary episode horizon (or epoch cutoff).
-        """
-
-        path_slice = slice(self.path_start_idx, self.ptr)
-
-        arm_summed_costs = np.zeros(self.ptr - self.path_start_idx + 1)
-
-        for i in range(self.N):
-            rews = np.append(self.rew_buf[path_slice, i], last_vals[i])
-            # TODO implement training that makes use of last_costs, i.e., use all samples to update lam
-            costs = np.append(self.cost_buf[path_slice, i], 0)
-            # print(costs)
-            lambds = np.append(self.lamb_buf[path_slice], 0)
-
-            arm_summed_costs += costs
-            # adjust based on action costs
-
-            rews = rews - lambds*costs
-
-            vals = np.append(self.val_buf[path_slice, i], last_vals[i])
-            
-            # the next two lines implement GAE-Lambda advantage calculation
-            qs = rews[:-1] + self.gamma * vals[1:]
-            deltas = qs - vals[:-1]
-            self.adv_buf[path_slice, i] = core.discount_cumsum(deltas, self.gamma * self.lam_OTHER)
-            
-            # the next line computes rewards-to-go, to be targets for the value function
-            self.ret_buf[path_slice, i] = core.discount_cumsum(rews, self.gamma)[:-1]
-
-            # store the learned q functions
-            self.q_buf[path_slice, i]   = qs
-            
-            self.path_start_idx = self.ptr
-
-
-        # the next line computes costs-to-go, to be part of the loss for the lambda net
-        self.cdcost_buf[path_slice] = core.discount_cumsum(arm_summed_costs, self.gamma)[:-1]
-
-
-
-
-    def get(self):
-        """
-        Call this at the end of an epoch to get all of the data from
-        the buffer, with advantages appropriately normalized (shifted to have
-        mean zero and std one). Also, resets some pointers in the buffer.
-        """
-        assert self.ptr == self.max_size    # buffer has to be full before you can get
-        self.ptr, self.path_start_idx = 0, 0
-        for i in range(self.N):
-            # the next two lines implement the advantage normalization trick
-            adv_mean, adv_std = mpi_statistics_scalar(self.adv_buf[:, i])
-            self.adv_buf[:, i] = (self.adv_buf[:, i] - adv_mean) / adv_std
-        
-        
-        data = dict(obs=self.obs_buf, act=self.act_buf, ret=self.ret_buf,
-                adv=self.adv_buf, logp=self.logp_buf, qs=self.q_buf, oha=self.oha_buf, 
-                ohs=self.ohs_buf, costs=self.cdcost_buf, lambdas=self.lamb_buf)
-        return {k: torch.as_tensor(v, dtype=torch.float32) for k,v in data.items()}
 
 
 class AgentOracle:
@@ -203,7 +62,6 @@ class AgentOracle:
         if data == 'sis':
             self.env_fn = lambda : SISRobustEnv(N,B,pop_size,seed)
 
-        self.actor_critic=core.MLPActorCriticRMAB
         self.agent_kwargs=agent_kwargs
 
         self.strat_ind = 0
@@ -231,7 +89,7 @@ class AgentOracle:
         return self.best_response_per_cpu(nature_strats, nature_eq, add_to_seed, seed=self.seed,  logger_kwargs=logger_kwargs, **self.agent_kwargs)
 
     # add_to_seed is obsolete
-    def best_response_per_cpu(self, nature_strats, nature_eq, add_to_seed, actor_critic=core.MLPActorCriticRMAB, ac_kwargs=dict(), seed=0, 
+    def best_response_per_cpu(self, nature_strats, nature_eq, add_to_seed, actor_critic=None, ac_kwargs=dict(), seed=0, 
             steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
             vf_lr=1e-3, qf_lr=1e-3, lm_lr=5e-2, train_pi_iters=80, train_v_iters=80, train_q_iters=80,
             lam_OTHER=0.97,
