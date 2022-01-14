@@ -19,22 +19,23 @@ from armman.offline_trajectory import get_offline_dataset
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ARMMAN decision-focused learning')
     parser.add_argument('--method', default='TS', type=str, help='TS (two-stage learning) or DF (decision-focused learning).')
-    parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
+    parser.add_argument('--env', default='POMDP', type=str, help='general (MDP) or POMDP.')
     parser.add_argument('--data', default='synthetic', type=str, help='synthetic or pilot')
     parser.add_argument('--sv', default='.', type=str, help='save string name')
     parser.add_argument('--epochs', default=10, type=int, help='num epochs')
     parser.add_argument('--instances', default=50, type=int, help='num instances')
-    parser.add_argument('--ope', default='IS', type=str, help='importance sampling (IS) or simulation-based (sim).')
+    parser.add_argument('--ope', default='sim', type=str, help='importance sampling (IS) or simulation-based (sim).')
     parser.add_argument('--seed', default=0, type=int, help='random seed for synthetic data generation.')
 
     args = parser.parse_args()
     print('argparser arguments', args)
-
+    
+    print ("OPE SETTING IS: ", args.ope)
     n_benefs = 100
     n_trials = 10
     L = 10
     K = 20
-    n_states = 2
+    n_states = 5
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
