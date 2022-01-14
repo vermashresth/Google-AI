@@ -132,7 +132,7 @@ if __name__ == '__main__':
                         raise NotImplementedError
                     # print('Evaluation time:', time.time() - start_time)
 
-                    ts_weight = 0.1
+                    ts_weight = 0.5
                     performance = -ope * (1 - ts_weight) + loss * ts_weight
 
                 # backpropagation
