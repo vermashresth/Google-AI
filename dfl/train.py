@@ -32,7 +32,7 @@ if __name__ == '__main__':
     
     print ("OPE SETTING IS: ", args.ope)
     n_benefs = 100
-    n_trials = 10
+    n_trials = 100
     L = 10
     K = 20
     n_states = 5
