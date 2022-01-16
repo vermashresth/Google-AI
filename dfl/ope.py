@@ -181,7 +181,9 @@ class opeSimulator(object):
         average_reward = tf.reduce_mean(tf.convert_to_tensor(simulated_rewards, dtype=tf.float32))
 
         def gradient_function(dsoln):
-            cumulative_rewards = tf.math.cumsum(tf.convert_to_tensor(reward_record, dtype=tf.float32), axis=2, reverse=True)
+            gamma_list = np.repeat(np.reshape(self.gamma ** np.arange(self.T), (1,1,self.T,1)), repeats=self.OPE_sim_n_trials, axis=0)
+            discounted_reward_record = reward_record * gamma_list
+            cumulative_rewards = tf.math.cumsum(tf.convert_to_tensor(discounted_reward_record, dtype=tf.float32), axis=2, reverse=True)
             with tf.GradientTape() as tmp_tape:
                 tmp_tape.watch(w)
                 probs_raw = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K), (self.OPE_sim_n_trials, self.T, self.n_benefs))
