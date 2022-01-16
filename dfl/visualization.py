@@ -219,3 +219,27 @@ if args.plot:
     plt.show()
 
 
+  ### Table information
+  ts_selected_metrics = []
+  df_is_selected_metrics = []
+  df_sim_selected_metrics = []
+  for sd in range(args.seed, args.seed+args.tr):
+    # Two-stage selected epoch
+    ts_selected_epoch = np.argmax(ts_outputs[sd][0]['val'][:-2]) # loss metric
+    ts_selected_metrics.append([ts_outputs[sd][i]['test'][ts_selected_epoch] for i in range(3)])
+
+    # DF-IS selected epoch
+    df_is_selected_epoch = np.argmax(df_is_outputs[sd][0]['val'][:-2]) # loss metric
+    df_is_selected_metrics.append([df_is_outputs[sd][i]['test'][df_is_selected_epoch] for i in range(3)])
+
+    # DF-sim selected epoch
+    df_sim_selected_epoch = np.argmax(df_sim_outputs[sd][0]['val'][:-2]) # loss metric
+    df_sim_selected_metrics.append([df_sim_outputs[sd][i]['test'][df_sim_selected_epoch] for i in range(3)])
+
+  ts_test_mean, ts_test_ste         = np.mean(ts_selected_metrics, axis=0), np.std(ts_selected_metrics, axis=0) / np.sqrt(len(ts_outputs))
+  df_is_test_mean, df_is_test_ste   = np.mean(df_is_selected_metrics, axis=0), np.std(df_is_selected_metrics, axis=0) / np.sqrt(len(df_is_outputs))
+  df_sim_test_mean, df_sim_test_ste = np.mean(df_sim_selected_metrics, axis=0), np.std(df_sim_selected_metrics, axis=0) / np.sqrt(len(df_sim_outputs))
+
+  print('Two-stage test metrics mean: {}, std: {}'.format(ts_test_mean, ts_test_ste))
+  print('DF-IS test metrics mean: {}, std: {}'.format(df_is_test_mean, df_is_test_ste))
+  print('DF-sim test metrics mean: {}, std: {}'.format(df_sim_test_mean, df_sim_test_ste))
