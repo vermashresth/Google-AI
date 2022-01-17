@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import time
 import os
+import pickle
 from itertools import product
 
 print(os.getcwd())
@@ -25,7 +26,7 @@ import mdptoolbox
 import matplotlib.pyplot as plt
 
 index_policies = [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
-RL_policies = [101, 102]
+RL_policies = [101, 102, 201]
 
 
 def list_valid_action_combinations(N,C,B,options):
@@ -127,16 +128,21 @@ class RobustEnvWrapperWhittleArmman():
         env_dict = vars(env)
         for attr in [a for a in env_dict if '__' not in a]:
             self.__dict__[attr] = env_dict[attr]
+        print(self.__dict__.keys())
 
     def seed(self, seed):
         return self.env.seed(seed)
 
     def reset(self):
-        return self.env.reset_random()
+        out = self.env.reset_random()
+        self.current_arms_state = self.env.current_arms_state
+        return out
 
     def step(self, actions):
         a_nature = self.nature_policy.get_nature_action(self.env.current_count_state)
-        return self.env.step(actions.flatten(), a_nature)
+        out = self.env.step(actions.flatten(), a_nature)
+        self.current_arms_state = self.env.current_arms_state
+        return out
 
 
 
@@ -458,12 +464,18 @@ def getActions(N, T, R, C, B, t, policy_option, act_dim, rl_info=None,
 
         if rl_info['data_type'] == 'discrete':
             # actions = get_action_rl(rl_info['model'], current_state)
-            # a_agent_arms = agent_pol.act_test_cluster_to_indiv(env.cluster_mapping,
-            #                                                    env.current_arms_state,
-            #                                                    env.B)
-            actions = np.zeros(env.n_arms)
+            agent_pol = rl_info['model']
+            actions = agent_pol.act_test_cluster_to_indiv(env.cluster_mapping,
+                                                               env.current_arms_state,
+                                                               env.B)
+            # actions = np.zeros(env.n_arms)
             return actions
 
+def load_wh_model_dict(filename):
+    with open(filename, 'rb') as file:
+        file.seek(0)
+        model_dict = pickle.load(file)
+    return model_dict
 # make function for producing an action given a single state
 def get_action_rl(model, x):
     with torch.no_grad():
@@ -513,6 +525,12 @@ def simulateAdherence(N, L, T, R, C, B, policy_option, start_state, seedbase=Non
         if policy_option == 102:
             model = load_pytorch_policy(rl_info['model_file_path_rmab'], "")
             rl_info['model'] =  model
+        if policy_option == 201:
+            model_dict = load_wh_model_dict(rl_info['model_file_path_rmab_wh'])
+            for strat in model_dict['agent_strategies']:
+                if str(strat).startswith('Whittle Policy'):
+                    rl_info['model'] = strat
+                    break
 
     print('Running simulation w/ policy: %s'%policy_option)
     if policy_option in index_policies:
@@ -792,6 +810,7 @@ if __name__=="__main__":
     rl_info = {
         'model_file_path_combinatorial':args.rl_combinatorial_model_filepath,
         'model_file_path_rmab':args.rl_rmab_model_filepath,
+        'model_file_path_rmab_wh': '/Users/vermashresth/Documents/Google-AI-RobustClusterRMAB/logs/model_dump/setup_test_n10_b5.0_h10_epoch1_dataarmman_seed0',
         'data_type':args.data_type,
         'compute_hawkins_lambda':False
 
