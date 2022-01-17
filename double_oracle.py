@@ -13,6 +13,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import torch
+import pickle
 
 import matplotlib.pyplot as plt
 
@@ -944,3 +945,11 @@ if __name__ == '__main__':
 
     if not args.cannon:
         plt.show()
+    print('saving model')
+    model_dict = {'agent_eq': agent_eq, 'nature_eq': nature_eq,
+                  'agent_strategies': do.agent_strategies, 'nature_strategies': do.nature_strategies,
+                  'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret}
+    save_path = os.path.join(args.home_dir, f'logs/model_dump/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}')
+    with open(save_path, 'wb') as filename:
+        pickle.dump(model_dict, filename)
+                  
