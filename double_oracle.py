@@ -85,19 +85,19 @@ class DoubleOracle:
         if data == 'random':
             self.env_fn = lambda : RandomBanditEnv(N,S,A,budget,seed,reward_bound)
 
-        if data == 'random_reset':
+        elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
 
-        if data == 'armman':
+        elif data == 'armman':
             self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed)
 
-        if data == 'circulant':
+        elif data == 'circulant':
             self.env_fn = lambda : CirculantDynamicsEnv(N,budget,seed)
 
-        if data == 'counterexample':
+        elif data == 'counterexample':
             self.env_fn = lambda : CounterExampleRobustEnv(N,budget,seed)
 
-        if data == 'sis':
+        elif data == 'sis':
             self.env_fn = lambda : SISRobustEnv(N,budget,pop_size,seed)
             self.nature_state_norm = 1
 
@@ -162,7 +162,7 @@ class DoubleOracle:
 
             add_to_seed = 0#self.n_cpu*n_epochs
 
-            # if first epoch, defender response is ideal defender for initial attractiveness
+            # in first epoch, defender response is ideal defender for initial attractiveness
             agent_br = self.agent_oracle.best_response(self.nature_strategies, nature_eq, add_to_seed)
             # self.update_payoffs_agent(agent_br)
             nature_br = self.nature_oracle.best_response(self.agent_strategies, agent_eq, add_to_seed)
@@ -509,7 +509,7 @@ if __name__ == '__main__':
                             RandomNaturePolicy, PessimisticNaturePolicy, MiddleNaturePolicy, 
                             OptimisticNaturePolicy, DetermNaturePolicy
                         )
-    if args.data == 'sis':
+    elif args.data == 'sis':
         from robust_rmab.baselines.nature_baselines_sis import   (
                             RandomNaturePolicy, PessimisticNaturePolicy, MiddleNaturePolicy, 
                             OptimisticNaturePolicy

@@ -15,7 +15,7 @@ import time
 from robust_rmab.utils.logx import EpochLogger
 from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
 from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
-from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv, ARMMANEnv
+#from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv, ARMMANEnv
 from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
 
 from robust_rmab.algos.whittle.whittle_policy import WhittlePolicy
@@ -47,19 +47,19 @@ class AgentOracle:
         if data == 'random':
             self.env_fn = lambda : RandomBanditEnv(N,S,A,B,seed,REWARD_BOUND)
 
-        if data == 'random_reset':
+        elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,B,seed,REWARD_BOUND)
 
-        if data == 'armman':
+        elif data == 'armman':
             self.env_fn = lambda : ARMMANRobustEnv(N,B,seed)
 
-        if data == 'circulant':
+        elif data == 'circulant':
             self.env_fn = lambda : CirculantDynamicsEnv(N,B,seed)
 
-        if data == 'counterexample':
+        elif data == 'counterexample':
             self.env_fn = lambda : CounterExampleRobustEnv(N,B,seed)
 
-        if data == 'sis':
+        elif data == 'sis':
             self.env_fn = lambda : SISRobustEnv(N,B,pop_size,seed)
 
         self.agent_kwargs=agent_kwargs
@@ -117,12 +117,203 @@ class AgentOracle:
                                  )
 
 
-        o = env.reset()
+        # Sync params across processes
+        sync_params(ac)
+
+        # Set up experience buffer
+        local_steps_per_epoch = int(steps_per_epoch / num_procs())
+
+
+        buf = RMABPPO_Buffer(obs_dim, act_dim, env.N, ac.act_type, local_steps_per_epoch,
+                        one_hot_encode=self.one_hot_encode, gamma=gamma, lam_OTHER=lam_OTHER)
+
+        FINAL_TRAIN_LAMBDAS = final_train_lambdas
+
+
+        # Set up function for computing RMABPPO policy loss
+        def compute_loss_pi(data, entropy_coeff):
+            ohs, act, adv, logp_old, lambdas, obs = data['ohs'], data['act'], data['adv'], data['logp'], data['lambdas'], data['obs']
+
+            lamb_to_concat = np.repeat(lambdas, env.N).reshape(-1,env.N,1)
+            full_obs = None
+            if ac.one_hot_encode:
+                full_obs = torch.cat([ohs, lamb_to_concat], axis=2)
+            else:
+                obs = obs/self.state_norm
+                obs = obs.reshape(obs.shape[0], obs.shape[1], 1)
+                full_obs = torch.cat([obs, lamb_to_concat], axis=2)
+
+            loss_pi_list = np.zeros(env.N,dtype=object)
+            pi_info_list = np.zeros(env.N,dtype=object)
+
+            # Policy loss
+            for i in range(env.N):
+                pi, logp = ac.pi_list[i](full_obs[:, i], act[:, i])
+                ent = pi.entropy().mean()
+                ratio = torch.exp(logp - logp_old[:, i])
+                clip_adv = torch.clamp(ratio, 1-clip_ratio, 1+clip_ratio) * adv[:, i]
+                loss_pi = -(torch.min(ratio * adv[:, i], clip_adv)).mean()
+                
+                # subtract entropy term since we want to encourage it 
+                loss_pi -= entropy_coeff*ent
+
+
+                loss_pi_list[i] = loss_pi
+
+                # Useful extra info
+                approx_kl = (logp_old[:, i] - logp).mean().item()
+                
+                clipped = ratio.gt(1+clip_ratio) | ratio.lt(1-clip_ratio)
+                clipfrac = torch.as_tensor(clipped, dtype=torch.float32).mean().item()
+                pi_info = dict(kl=approx_kl, ent=ent.item(), cf=clipfrac)
+                pi_info_list[i] = pi_info
+
+            return loss_pi_list, pi_info_list
+
+        # Set up function for computing value loss
+        def compute_loss_v(data):
+            ohs, ret, lambdas, obs = data['ohs'], data['ret'], data['lambdas'], data['obs']
+            lamb_to_concat = np.repeat(lambdas, env.N).reshape(-1,env.N,1)
+            full_obs = None
+            if ac.one_hot_encode:
+                full_obs = torch.cat([ohs, lamb_to_concat], axis=2)
+            else:
+                obs = obs/self.state_norm
+                obs = obs.reshape(obs.shape[0], obs.shape[1], 1)
+                full_obs = torch.cat([obs, lamb_to_concat], axis=2)
+
+            loss_list = np.zeros(env.N,dtype=object)
+            for i in range(env.N):
+                loss_list[i] = ((ac.v_list[i](full_obs[:, i]) - ret[:, i])**2).mean()
+            return loss_list
+
+        def compute_loss_q(data):
+
+            ohs, qs, oha, lambdas  = data['ohs'], data['qs'], data['oha'], data['lambdas']
+            lamb_to_concat = np.repeat(lambdas, env.N).reshape(-1,env.N,1)
+            full_obs = None
+            if ac.one_hot_encode:
+                full_obs = torch.cat([ohs, lamb_to_concat], axis=2)
+            else:
+                obs = obs/self.state_norm
+                obs = obs.reshape(obs.shape[0], obs.shape[1], 1)
+                full_obs = torch.cat([obs, lamb_to_concat], axis=2)
+
+            loss_list = np.zeros(env.N,dtype=object)
+            for i in range(env.N):
+                x = torch.as_tensor(np.concatenate([full_obs[:, i], oha[:, i]], axis=1), dtype=torch.float32)
+                loss_list[i] = ((ac.q_list[i](x) - qs[:, i])**2).mean()
+            return loss_list
+
+        
+        def compute_loss_lambda(data):
+
+            disc_cost = data['costs'][0]
+            # lamb = data['lambdas'][0]
+            obs = data['obs'][0]
+            if not self.one_hot_encode:
+                obs = obs/self.state_norm
+            lamb = ac.lambda_net(torch.as_tensor(obs,dtype=torch.float32))
+            # print('lamb',lamb, 'term 1', env.B/(1-gamma), 'cost',disc_cost, 'diff', env.B/(1-gamma) - disc_cost)
+            # print('term 1', , 'cost',disc_cost)
+            # print('term 1',env.B/(1-gamma))
+            # print('cost',disc_cost)
+
+            loss = lamb*(env.B/(1-gamma) - disc_cost)
+            # print(loss)
+
+            return loss
+
+        # Set up optimizers for policy and value function
+        pi_optimizers = np.zeros(env.N,dtype=object)
+        vf_optimizers = np.zeros(env.N,dtype=object)
+        qf_optimizers = np.zeros(env.N,dtype=object)
+
+        for i in range(env.N):
+            pi_optimizers[i] = Adam(ac.pi_list[i].parameters(), lr=pi_lr)
+            # pi_optimizers[i] = SGD(ac.pi_list[i].parameters(), lr=pi_lr)
+            vf_optimizers[i] = Adam(ac.v_list[i].parameters(), lr=vf_lr)
+            # vf_optimizers[i] = SGD(ac.v_list[i].parameters(), lr=vf_lr)
+            qf_optimizers[i] = Adam(ac.q_list[i].parameters(), lr=qf_lr)
+            # qf_optimizers[i] = SGD(ac.q_list[i].parameters(), lr=qf_lr)
+        # lambda_optimizer = Adam(ac.lambda_net.parameters(), lr=lm_lr)
+        lambda_optimizer = SGD(ac.lambda_net.parameters(), lr=lm_lr)
+
+
+        # Set up model saving
+        logger.setup_pytorch_saver(ac)
+
+
+
+        def update(epoch, head_entropy_coeff):
+            data = buf.get()
+
+            entropy_coeff = 0.0
+            if (epochs - epoch) > FINAL_TRAIN_LAMBDAS:
+                # cool entropy down as we relearn policy for each lambda
+                entropy_coeff_schedule = np.linspace(head_entropy_coeff,0,lamb_update_freq)
+                # don't rotate
+                # entropy_coeff_schedule = entropy_coeff_schedule[1:] + entropy_coeff_schedule[:1]
+                ind = epoch%lamb_update_freq
+                entropy_coeff = entropy_coeff_schedule[ind]
+            # print('entropy',entropy_coeff)
+
+            # Train policy with multiple steps of gradient descent
+            for _ in range(train_pi_iters):
+                for i in range(env.N):
+                    pi_optimizers[i].zero_grad()
+                loss_pi, pi_info = compute_loss_pi(data, entropy_coeff)
+                for i in range(env.N):
+                    kl = mpi_avg(pi_info[i]['kl'])
+                    # if kl > 1.5 * target_kl:
+                    #     logger.log('Early stopping at step %d due to reaching max kl.'%i)
+                    #     break
+                    loss_pi[i].backward()
+                    mpi_avg_grads(ac.pi_list[i])    # average grads across MPI processes
+                    pi_optimizers[i].step()
+
+            logger.store(StopIter=i)
+
+            # Value function learning
+            for i in range(train_v_iters):
+                for i in range(env.N):
+                    vf_optimizers[i].zero_grad()
+                loss_v = compute_loss_v(data)
+                for i in range(env.N):
+                    loss_v[i].backward()
+                    mpi_avg_grads(ac.v_list[i])    # average grads across MPI processes
+                    vf_optimizers[i].step()
+
+
+            # Lambda optimization
+            if epoch%lamb_update_freq == 0 and epoch > 0 and (epochs - epoch) > FINAL_TRAIN_LAMBDAS:
+                # for i in range(train_lam_iters):
+
+                # Should only update this once because we only get one sample from the environment
+                # unless we are running parallel instances
+                lambda_optimizer.zero_grad()
+                loss_lamb = compute_loss_lambda(data)
+                
+                loss_lamb.backward()
+                last_param = list(ac.lambda_net.parameters())[-1]
+                # print('last param',last_param)
+                # print('grad',last_param.grad)
+
+                mpi_avg_grads(ac.lambda_net)    # average grads across MPI processes
+                lambda_optimizer.step()
+                
+
+        # Prepare for interaction with environment
+        start_time = time.time()
+        current_lamb = 0
+
+        o, ep_actual_ret, ep_lamb_adjusted_ret, ep_len = env.reset(), 0, 0, 0
         o = o.reshape(-1)
 
         # Sample a nature policy
         # TODO: Currently we only calculate best response to one sample of nature policy from nature mixed strategy
         # TODO: Instead we want to calculate best response to expected nature from nature mixed strategy
+        # TODO: this is only sampling one strategy. 
         nature_eq = np.array(nature_eq)
         nature_eq[nature_eq < 0] = 0
         nature_eq = nature_eq / nature_eq.sum()
@@ -139,7 +330,15 @@ class AgentOracle:
         torch_o = torch.as_tensor(o, dtype=torch.float32)
         a_nature = nature_pol.get_nature_action(torch_o)
 
+        # Resample nature policy every time we update lambda
+        if epoch%lamb_update_freq == 0 and epoch > 0:
+            nature_pol = np.random.choice(nature_strats, p=nature_eq)
+            
+        torch_o = torch.as_tensor(o, dtype=torch.float32)
+        a_nature = nature_pol.get_nature_action(torch_o)
+
         a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
+        print('nature transitions:', a_nature_env)
 
         # Whittle policy action
         wh_policy.note_env(env)
@@ -173,13 +372,14 @@ class AgentOracle:
 
             a_epoch_history = []
             for t in range(steps_per_epoch):
-                torch_o = torch.as_tensor(o, dtype=torch.float32)
+                torch_o  = torch.as_tensor(o, dtype=torch.float32)
                 a_agent  = agent_pol.act_test(torch_o)
                 a_nature = nature_pol.get_nature_action(torch_o)
                 a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
                 
                 
-                next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol)
+                next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol
+                                                      , debug=(epoch==0 and t==0))
 
                 a_epoch_history.append(a_agent_arms)
 
@@ -212,6 +412,7 @@ class AgentOracle:
     
     def calculate_fairness(self, a_history, epochs, steps_per_epoch, action_size):
         # Calculate HHI index to measure fairness in intervention distribution across arms
+        """ fairness determined by percentage pulls of each arm per epoch """
         print('calculating Fairness')
         a_history = np.array(a_history)
         assert a_history.shape==(epochs, steps_per_epoch, action_size), a_history.shape
@@ -221,6 +422,7 @@ class AgentOracle:
         pull_proportion_per_epoch = pulls_per_epoch/budget
         hhi_per_epoch = np.sum(np.square(pull_proportion_per_epoch), axis=1) 
         mean_hhi = np.mean(hhi_per_epoch, axis=0)
+        print(f'  HHI: {mean_hhi}')
         
         return mean_hhi
     
