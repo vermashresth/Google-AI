@@ -364,7 +364,7 @@ def getEmpProbsDecomposed(transitions_df, min_sup = 1):
                         
     return new_emp_prob, {'s_a_s_prime_dict': emp_prob , 'has_missing_values': has_missing_values}
 
-def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None):
+def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None, use_informed_prior=False):
     # This function does not prune the transitions of (s', a') that do not appear in (s, a)
     # The output is the empirical T_data that can be directly used for simulation.
     # This is only used for simulation but not for trajectory stitching.
@@ -376,6 +376,22 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None):
         n_states = m
         emp_prob = np.zeros((n_states, n_actions, n_states))
         default_prob = np.ones((n_states, n_actions, n_states)) / n_states
+        if use_informed_prior:
+            # Do not just use uniform prior. Use informed prior using population level transitions
+            all_transitions_df = getBenefsFullFrequency(traj, list(range(n_benefs)), policy_id)
+            for s in range(n_states):
+                for a in range(n_actions):
+                    s_a = all_transitions_df[(all_transitions_df['s']==s) &
+                                            (all_transitions_df['a']==a)
+                                        ]
+                    s_a_count = s_a.shape[0]
+                    for s_prime in range(n_states):
+                        s_a_s_prime = s_a[(s_a['s_prime']==s_prime)
+                                                    ]
+                        s_a_s_prime_count = s_a_s_prime.shape[0]
+                        if s_a_count >= 1:
+                            default_prob[s,a,s_prime] = s_a_s_prime_count / s_a_count
+        
     elif env == 'POMDP':
         n_states = m * H
         assert(H is not None)
