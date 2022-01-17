@@ -420,7 +420,8 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None, 
         transition_prob = default_prob.copy()
 
         for s in range(n_states):
-            emp_R_data[benef_id,s] = np.mean(transitions_df[transitions_df['s'] == s]['r'])
+            if len(transitions_df[transitions_df['s'] == s]) > 0:
+                emp_R_data[benef_id,s] = np.mean(transitions_df[transitions_df['s'] == s]['r'])
 
             for a in range(n_actions):
                 s_a = transitions_df[(transitions_df['s']==s) &

@@ -98,18 +98,18 @@ if __name__ == '__main__':
                     # if epoch==total_epoch:
                     #     prediction=label
                     
-                    # start_time = time.time()
-                    # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
-                    loss = twoStageNLLLoss(traj, prediction, beh_policy_name) # Two-stage custom NLL loss
-                    # print('two stage loss time:', time.time() - start_time)
-
                     # Setup MDP or POMDP environment
                     if env=='general':
                         T_data, R_data = prediction, raw_R_data
                         n_full_states = n_states
                     elif env=='POMDP':
                         T_data, R_data = POMDP2MDP(prediction, raw_R_data, H)
-                        n_full_state = n_states * H
+                        n_full_states = n_states * H
+                    
+                    # start_time = time.time()
+                    # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
+                    loss = twoStageNLLLoss(traj, T_data, beh_policy_name) # Two-stage custom NLL loss
+                    # print('two stage loss time:', time.time() - start_time)
 
                     # Batch Whittle index computation
                     # start_time = time.time()
