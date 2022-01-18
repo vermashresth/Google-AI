@@ -5,6 +5,7 @@ import tqdm
 import time
 import sys
 import pickle
+import random
 sys.path.insert(0, "../")
 
 from dfl.model import ANN
@@ -19,7 +20,7 @@ from armman.offline_trajectory import get_offline_dataset
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='ARMMAN decision-focused learning')
     parser.add_argument('--method', default='TS', type=str, help='TS (two-stage learning) or DF (decision-focused learning).')
-    parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
+    parser.add_argument('--env', default='POMDP', type=str, help='general (MDP) or POMDP.')
     parser.add_argument('--data', default='synthetic', type=str, help='synthetic or pilot')
     parser.add_argument('--sv', default='.', type=str, help='save string name')
     parser.add_argument('--epochs', default=10, type=int, help='num epochs')
@@ -39,7 +40,7 @@ if __name__ == '__main__':
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
-    TS_WEIGHT=0.2
+    TS_WEIGHT=0.1
 
     # Environment setup
     env = args.env
@@ -53,6 +54,7 @@ if __name__ == '__main__':
         n_instances = 12
         all_n_benefs = 7668
         n_benefs = int(all_n_benefs/n_instances)
+        n_benefs = 638
         n_trials = 1
         L = 7
         H = 7
@@ -60,9 +62,14 @@ if __name__ == '__main__':
         n_states = 2
         gamma = 0.99
         full_dataset = get_offline_dataset(beh_policy_name, L)
+        # For offline data, seed must be set here
+        np.random.seed(seed)
+        random.seed(seed)
+        tf.random.set_seed(seed)
     else:
         # dataset generation
         n_instances = args.instances
+        # Seed are set inside generateDataset function
         full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H, seed=seed)
 
 

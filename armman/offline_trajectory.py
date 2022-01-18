@@ -94,26 +94,36 @@ def get_offline_dataset(policy, T):
     all_n_benefs = 7668
     n_instance = 12
     n_benefs = int(all_n_benefs/n_instance)
+    n_benefs = 638
     L = T
     n_states = 2
     gamma = 0.99
     env = 'general'
     H = T
-    ope_simulator = opeSimulator(offline_traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', env=env, H=H)
-    print('got ope simulator')
     raw_T_data = None
     raw_R_data = np.array([[0, 1]*all_n_benefs]).reshape(all_n_benefs, 2)
+    R_data_ope_sim = np.array([[0, 1]*n_benefs]).reshape(n_benefs, 2)
+    ope_simulator = opeSimulator(offline_traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', R_data=R_data_ope_sim, env=env, H=H, use_informed_prior=True)
     simulated_rewards = None
 
+    # Boolean array representing 0 or 1 if a beneficiary was every intervened in T timesteps
+    ever_intervened = (action_record[0, 0, :, :].sum(axis=0)>0).astype(bool)
+    benef_idx_interv = np.arange(all_n_benefs)[ever_intervened]
+    benef_idx_not_interv = np.arange(all_n_benefs)[~ever_intervened]
     dataset = []
     # break trajectories by beneficiries into n_instance
     for idx in range(n_instance):
-        instance = (features[idx*n_benefs:(idx+1)*n_benefs], raw_T_data,
-                    raw_R_data[idx*n_benefs:(idx+1)*n_benefs],
-                    offline_traj[:, :, :, :, idx*n_benefs:(idx+1)*n_benefs], ope_simulator, simulated_rewards,
-                    state_record[:, :, :, idx*n_benefs:(idx+1)*n_benefs],
-                    action_record[:, :, :, idx*n_benefs:(idx+1)*n_benefs],
-                    reward_record[:, :, :, idx*n_benefs:(idx+1)*n_benefs])
+        n_benefs_interv = int(len(benef_idx_interv)/n_instance)
+        n_benefs_not_interv = int(len(benef_idx_not_interv)/n_instance)
+        interv_idx = list(benef_idx_interv[idx*n_benefs_interv:(idx+1)*n_benefs_interv])
+        not_interv_idx = list(benef_idx_not_interv[idx*n_benefs_not_interv:(idx+1)*n_benefs_not_interv])
+        all_idx = interv_idx+not_interv_idx
+        instance = (features[all_idx], raw_T_data,
+                    raw_R_data[all_idx],
+                    offline_traj[:, :, :, :, all_idx], ope_simulator, simulated_rewards,
+                    state_record[:, :, :, all_idx],
+                    action_record[:, :, :, all_idx],
+                    reward_record[:, :, :, all_idx])
         dataset.append(instance)
     return dataset
 

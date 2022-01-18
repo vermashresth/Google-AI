@@ -151,7 +151,7 @@ def opeISNaive(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh
 
 # Simulation-based OPE (differentiable and parallelizable)
 class opeSimulator(object):
-    def __init__(self, beh_traj, n_benefs, T, m, OPE_sim_n_trials, gamma, beh_policy_name, R_data, env='general', H=None):
+    def __init__(self, beh_traj, n_benefs, T, m, OPE_sim_n_trials, gamma, beh_policy_name, R_data, env='general', H=None, use_informed_prior=False):
         self.n_benefs = n_benefs
         self.T = T
         self.m = m
@@ -160,7 +160,7 @@ class opeSimulator(object):
         self.gamma = gamma
 
         policy_id = policy_map[beh_policy_name]
-        self.emp_T_data, self.emp_R_data = getEmpTransitionMatrix(traj=beh_traj, policy_id=policy_id, n_benefs=n_benefs, m=m, env=env, H=H)
+        self.emp_T_data, self.emp_R_data = getEmpTransitionMatrix(traj=beh_traj, policy_id=policy_id, n_benefs=n_benefs, m=m, env=env, H=H, use_informed_prior=use_informed_prior)
         if env == 'general':
             self.emp_R_data = R_data # Reward list is explicitly given in the MDP version
 
