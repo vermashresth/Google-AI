@@ -172,6 +172,9 @@ class DoubleOracle:
             print('Nature BR: ', nature_br)
             print('#'*20)
             print()
+            dummy_o = np.zeros(self.N, dtype=int)
+            dummy_o = torch.as_tensor(dummy_o, dtype=torch.float32)
+            print('Nature action: ', nature_br.get_nature_action(dummy_o))
 
             add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
             self.update_payoffs(nature_br, agent_br, add_to_seed)
@@ -949,7 +952,11 @@ if __name__ == '__main__':
     model_dict = {'agent_eq': agent_eq, 'nature_eq': nature_eq,
                   'agent_strategies': do.agent_strategies, 'nature_strategies': do.nature_strategies,
                   'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret}
-    save_path = os.path.join(args.home_dir, f'logs/model_dump/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}')
-    with open(save_path, 'wb') as filename:
-        pickle.dump(model_dict, filename)
+    save_path = f'{args.home_dir}/logs/model_dump/'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    save_file = f'{save_path}/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}.pickle'
+
+    with open(save_file, 'wb') as f:
+        pickle.dump(model_dict, f)
                   

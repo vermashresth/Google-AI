@@ -18,7 +18,7 @@ from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobus
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import os
+import os, sys
 # mpl.use('tkagg')
 from robust_rmab.algos.whittle.whittle_policy import WhittlePolicy
 
@@ -407,6 +407,51 @@ class NatureOracle:
         self.env.seed(seed)
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
+    def get_agent_counts(self, agent_pol, ac, env, steps_per_epoch, n_iterations=100):
+	# ac = nature actor/critic
+        INTERVENE = 1
+        counter = np.zeros((self.N, self.S))  # n_clusters, n_states
+        o = env.reset()
+        # TODO: why is this necessary? elsewhere this comes out as just [10] instead of [1, 10]
+
+        for epoch in range(n_iterations):
+            for t in range(steps_per_epoch): # horizon
+                o = o.reshape(-1)
+                print('o.shape', o.shape)
+                torch_o = torch.as_tensor(o, dtype=torch.float32)
+
+                print('torch_o shape', torch_o.shape)
+
+                a_agent  = agent_pol.act_test(torch_o)
+                # a_nature = nature_pol.get_nature_action(torch_o)
+
+                # ac's step function requires both world observation (for actor) and agent_policy's actions (for critic)
+                # but we can only obtain agent_policy's actions after determining nature's action
+                # so we split the ac.step into two parts, first pass some dummy agent_policy action
+                a_agent_list_dummy = np.zeros(self.N)
+                
+                # We obtain nature's action
+                a_nature, _, logp_nature, q_nature = ac.step(torch_o, a_agent_list_dummy)
+
+                # Bound nature's actions within allowed range
+                a_nature_env = ac.bound_nature_actions(a_nature, state=o, reshape=True)
+
+
+                next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol
+                                                      , debug=(epoch==0 and t==0))
+                for cluster in range(self.N):
+                    count # arms in each state s \in S
+                    for s in range(self.S):
+                        print('a_agent', a_agent)
+                        if a_agent == INTERVENE:
+                            counter[cluster, s] += 1
+                o = next_o
+       
+        # convert to probabilities 
+        counter /= (steps_per_epoch * n_iterations)
+        return counter
+
+
 
     # Todo - figure out parallelization with MPI -- not clear how to do this yet, so restrict to single cpu
     def best_response(self, nature_strats, nature_eq, add_to_seed):
@@ -469,6 +514,11 @@ class NatureOracle:
         act_dim_agent = ac.act_dim_agent
         act_dim_nature = ac.act_dim_nature
         obs_dim = ac.obs_dim
+
+        # Get count of agent actions
+        agent_pol = wh_policy
+        nature_pol = ac
+        #agent_counter = self.get_agent_counts(agent_pol, nature_pol, env, steps_per_epoch)
 
         # Sync params across processes
         sync_params(ac)
@@ -856,7 +906,7 @@ class NatureOracleMARL:
 
 
     # Todo - figure out parallelization with MPI -- not clear how to do this yet, so restrict to single cpu
-    def best_response(self, nature_strats, nature_eq, add_to_seed):
+    def best_response(self, agent_strats, agent_eq, add_to_seed):
 
         self.strat_ind+=1
 
@@ -869,7 +919,7 @@ class NatureOracleMARL:
         logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed, data_dir=data_dir)
         # logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed+add_to_seed, data_dir=data_dir)
 
-        return self.best_response_per_cpu(nature_strats, nature_eq, add_to_seed, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
+        return self.best_response_per_cpu(agent_strats, agent_eq, add_to_seed, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
 
     # add_to_seed is obsolete
     def best_response_per_cpu(self, agent_strats, agent_eq, add_to_seed, ma_actor_critic=core.RMABLambdaNatureOracle, ac_kwargs=dict(), 
