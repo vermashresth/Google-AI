@@ -33,10 +33,10 @@ if __name__ == '__main__':
     print('argparser arguments', args)
     print ("OPE SETTING IS: ", args.ope)
     n_benefs = 100
-    n_trials = 1000
+    n_trials = 100
     L = 10
     K = 20
-    n_states = 5
+    n_states = 4
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
