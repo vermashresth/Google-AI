@@ -40,7 +40,7 @@ if __name__ == '__main__':
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
-    TS_WEIGHT=0.1
+    TS_WEIGHT=0.5
 
     # Environment setup
     env = args.env
