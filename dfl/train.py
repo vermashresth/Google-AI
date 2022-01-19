@@ -33,7 +33,7 @@ if __name__ == '__main__':
     print('argparser arguments', args)
     print ("OPE SETTING IS: ", args.ope)
     n_benefs = 100
-    n_trials = 100
+    n_trials = 1000
     L = 10
     K = 20
     n_states = 5
