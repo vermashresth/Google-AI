@@ -91,7 +91,7 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
         # This part takes the longest preprocessing time.
         # start_time = time.time()
         OPE_sim_n_trials = 100
-        ope_simulator = opeSimulator(traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', R_data=R_data, env=env, H=H)
+        ope_simulator = opeSimulator(traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', T_data=T_data, R_data=R_data, env=env, H=H)
         # print('Initializing simulator time', time.time() - start_time)
 
         # print('real T data:', T_data[0])
