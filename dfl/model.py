@@ -7,7 +7,7 @@ class SyntheticANN(Model):
         super(SyntheticANN, self).__init__()
         self.d1 = Dense(64, activation='relu', trainable=False)
         self.d2 = Dense(64, activation='relu', trainable=False)
-        self.d3 = Dense(16, trainable=False) # generating feature of size 16
+        self.d3 = Dense(32, trainable=False) # generating feature of size 16
 
     def call(self, x):
         x1 = self.d1(x)
@@ -29,7 +29,7 @@ class ANN(Model):
         '''
         super(ANN, self).__init__()
         self.n_states = n_states
-        self.d1 = Dense(64, activation='relu', trainable=True, input_shape=(16,))
+        self.d1 = Dense(64, activation='relu', trainable=True, input_shape=(32,))
         self.d2 = Dense(n_states*2*n_states, activation='relu', trainable=True)
         self.softmax = Softmax()
 

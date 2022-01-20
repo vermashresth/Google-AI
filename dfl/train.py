@@ -125,6 +125,8 @@ if __name__ == '__main__':
                     # w = whittleIndex(prediction)
                     w = newWhittleIndex(T_data, R_data)
                     w = tf.reshape(w, (n_benefs, n_full_states))
+                    if epoch == total_epoch:
+                        w = tf.zeros((n_benefs, n_full_states))
                     # print('Whittle index time:', time.time() - start_time)
                     
                     # start_time = time.time()
