@@ -126,7 +126,7 @@ if args.plot:
     plt.ylabel('Intermediate Loss', fontsize=18)
     plt.title(mode+' Loss comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_loss.pdf')
+        plt.savefig('./figs/'+special+'_'+mode+'_loss.png')
     plt.show()
 
     ### IS OPE figure
@@ -176,7 +176,7 @@ if args.plot:
     plt.ylabel('IS-OPE', fontsize=18)
     plt.title(mode+' IS-OPE comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.pdf')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.png')
     plt.show()
 
     ### SIM-OPE figure
@@ -226,7 +226,7 @@ if args.plot:
     plt.ylabel('OPE-Sim', fontsize=18)
     plt.title(mode+' Sim-OPE comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.pdf')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.png')
     plt.show()
 
 

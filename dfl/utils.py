@@ -63,7 +63,7 @@ def generateRandomTMatrix(n_benefs, n_states, R_data):
             while True:
                 passive_transition = getRandomProbabilityDistribution(n_states)
                 active_transition  = getRandomProbabilityDistribution(n_states)
-                if active_transition @ R_data > passive_transition @ R_data:
+                if active_transition @ R_data > passive_transition @ R_data + 0.2: # Ensure that calling is significantly better
                     T[i,j,0,:] = passive_transition
                     T[i,j,1,:] = active_transition
                     break

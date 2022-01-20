@@ -40,7 +40,7 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
     # Generating synthetic data
     for i in range(n_instances):
         # Generate rewards from uniform distribution
-        R = sorted(np.random.uniform(size=n_states))
+        R = np.arange(n_states) # sorted(np.random.uniform(size=n_states))
         R = (R - np.min(R)) / np.ptp(R) # normalize rewards
         raw_R_data = np.repeat(R.reshape(1,-1), n_benefs, axis=0) # using the same rewards across all arms (for simplicity)
 

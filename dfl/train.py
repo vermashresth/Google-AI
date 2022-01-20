@@ -40,7 +40,7 @@ if __name__ == '__main__':
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
-    TS_WEIGHT=0.1
+    TS_WEIGHT=0.5
 
     # Environment setup
     env = args.env
@@ -98,8 +98,9 @@ if __name__ == '__main__':
             if mode == 'train':
                 dataset = tqdm.tqdm(dataset)
 
-            for (feature, _, raw_R_data, traj, ope_simulator, _, state_record, action_record, reward_record) in dataset:
+            for (feature, label, raw_R_data, traj, ope_simulator, _, state_record, action_record, reward_record) in dataset:
                 feature = tf.constant(feature, dtype=tf.float32)
+                label   = tf.constant(label, dtype=tf.float32)
                 raw_R_data = tf.constant(raw_R_data, dtype=tf.float32)
 
                 with tf.GradientTape() as tape:
@@ -117,7 +118,7 @@ if __name__ == '__main__':
                     
                     # start_time = time.time()
                     # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
-                    loss = twoStageNLLLoss(traj, T_data, beh_policy_name) # Two-stage custom NLL loss
+                    loss = twoStageNLLLoss(traj, T_data, beh_policy_name) - twoStageNLLLoss(traj, label, beh_policy_name) # Two-stage custom NLL loss
                     # print('two stage loss time:', time.time() - start_time)
 
                     # Batch Whittle index computation
