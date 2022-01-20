@@ -80,6 +80,8 @@ if args.plot:
     ### Loss figure
     plt.figure()
     
+    lw = 3
+
     df_is_means=[]
     df_is_errors=[]
     df_sim_means=[]
@@ -108,21 +110,23 @@ if args.plot:
     ts_means=np.array(ts_means)
     ts_errors=np.array(ts_errors)
 
-    plt.plot(range(num_epochs), df_is_means, label='DF-IS')
-    plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2)
+    plt.plot(range(num_epochs), df_is_means, label='DF-IS', color='#4285F4', lw=lw)
+    plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2, color='#4285F4')
     
     # plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
     # plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
     
-    plt.plot(range(num_epochs), ts_means, label='TS')
-    plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2)
+    plt.plot(range(num_epochs), ts_means, label='TS', color='#F4B400', lw=lw)
+    plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2, color='#F4B400')
 
-    plt.legend()
+    # plt.hlines(random_mean[0], xmin=0, xmax=num_epochs, colors='#DB4437', lw=lw, linestyle='dashed', label='random')
+
+    plt.legend(fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
     plt.ylabel('Intermediate Loss', fontsize=18)
     plt.title(mode+' Loss comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_loss.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_loss.pdf')
     plt.show()
 
     ### IS OPE figure
@@ -156,21 +160,23 @@ if args.plot:
     ts_means=np.array(ts_means)
     ts_errors=np.array(ts_errors)
 
-    plt.plot(range(num_epochs), df_is_means, label='DF-IS')
-    plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2)
+    plt.plot(range(num_epochs), df_is_means, label='DF-IS', color='#4285F4', lw=lw)
+    plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2, color='#4285F4')
     
     # plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
     # plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
     
-    plt.plot(range(num_epochs), ts_means, label='TS')
-    plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2)
+    plt.plot(range(num_epochs), ts_means, label='TS', color='#F4B400', lw=lw)
+    plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2, color='#F4B400')
 
-    plt.legend()
+    plt.hlines(random_mean[1], xmin=0, xmax=num_epochs, colors='#DB4437', lw=lw, linestyle='dashed', label='random')
+    
+    plt.legend(fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
     plt.ylabel('IS-OPE', fontsize=18)
     plt.title(mode+' IS-OPE comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.pdf')
     plt.show()
 
     ### SIM-OPE figure
@@ -204,21 +210,23 @@ if args.plot:
     ts_means=np.array(ts_means)
     ts_errors=np.array(ts_errors)
 
-    plt.plot(range(num_epochs), df_is_means, label='DF-IS')
-    plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2)
+    plt.plot(range(num_epochs), df_is_means, label='DF-IS', color='#4285F4', lw=lw)
+    plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2, color='#4285F4')
     
     # plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
     # plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
     
-    plt.plot(range(num_epochs), ts_means, label='TS')
-    plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2)
+    plt.plot(range(num_epochs), ts_means, label='TS', color='#F4B400', lw=lw)
+    plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2, color='#F4B400')
 
-    plt.legend()
+    plt.hlines(random_mean[1], xmin=0, xmax=num_epochs, colors='#DB4437', lw=lw, linestyle='dashed', label='random')
+    
+    plt.legend(fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
     plt.ylabel('OPE-Sim', fontsize=18)
     plt.title(mode+' Sim-OPE comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.pdf')
     plt.show()
 
 
