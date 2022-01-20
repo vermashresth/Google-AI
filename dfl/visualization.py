@@ -74,7 +74,7 @@ if args.plot:
 
     num_epochs= len(df_is_outputs[0][0][mode])-1 ## Last entry is the OPE if GT is perfectly known
 
-    random_metrics = [[ts_outputs[sd-args.seed][i][mode][-1] for i in range(3)] for sd in range(args.seed, args.seed+args.tr)]
+    random_metrics = [[ts_outputs[sd-args.seed][i][mode][0] for i in range(3)] for sd in range(args.seed, args.seed+args.tr)]
     random_mean, random_ste = np.mean(random_metrics, axis=0), np.std(random_metrics, axis=0) / np.sqrt(len(ts_outputs))
     
     ### Loss figure

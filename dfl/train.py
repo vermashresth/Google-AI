@@ -36,11 +36,11 @@ if __name__ == '__main__':
     n_trials = 100
     L = 10
     K = 20
-    n_states = 5
+    n_states = 2
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
-    TS_WEIGHT=0.5
+    TS_WEIGHT=0.1
 
     # Environment setup
     env = args.env
