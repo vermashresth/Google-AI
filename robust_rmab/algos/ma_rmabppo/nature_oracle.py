@@ -21,6 +21,7 @@ import matplotlib.pyplot as plt
 import os, sys
 # mpl.use('tkagg')
 from robust_rmab.algos.whittle.whittle_policy import WhittlePolicy
+from robust_rmab.baselines.nature_baselines_armman import CustomPolicy
 
 
 class MA_RMABPPO_Buffer:
@@ -408,19 +409,17 @@ class NatureOracle:
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
     def get_agent_counts(self, agent_pol, ac, env, steps_per_epoch, n_iterations=100):
+        """ TODO """
 	# ac = nature actor/critic
         INTERVENE = 1
         counter = np.zeros((self.N, self.S))  # n_clusters, n_states
         o = env.reset()
-        # TODO: why is this necessary? elsewhere this comes out as just [10] instead of [1, 10]
 
         for epoch in range(n_iterations):
             for t in range(steps_per_epoch): # horizon
+                # TODO: why is this necessary? elsewhere this comes out as just [10] instead of [1, 10]
                 o = o.reshape(-1)
-                print('o.shape', o.shape)
                 torch_o = torch.as_tensor(o, dtype=torch.float32)
-
-                print('torch_o shape', torch_o.shape)
 
                 a_agent  = agent_pol.act_test(torch_o)
                 # a_nature = nature_pol.get_nature_action(torch_o)
@@ -436,27 +435,30 @@ class NatureOracle:
                 # Bound nature's actions within allowed range
                 a_nature_env = ac.bound_nature_actions(a_nature, state=o, reshape=True)
 
-
                 next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol
                                                       , debug=(epoch==0 and t==0))
                 for cluster in range(self.N):
-                    count # arms in each state s \in S
+                    # count number of arms in each state s \in S
                     for s in range(self.S):
-                        print('a_agent', a_agent)
-                        if a_agent == INTERVENE:
-                            counter[cluster, s] += 1
+                        counter[cluster, s] += np.sum(a_agent)  # number of action that are intervene (assuming intervene = action 1)
+                    #    if a_agent == INTERVENE:
+                    #        counter[cluster, s] += 1
                 o = next_o
        
         # convert to probabilities 
         counter /= (steps_per_epoch * n_iterations)
+        print('counter:', counter)
         return counter
 
 
 
     # Todo - figure out parallelization with MPI -- not clear how to do this yet, so restrict to single cpu
     def best_response(self, nature_strats, nature_eq, add_to_seed):
+        self.strat_ind += 1
+        
+        # temporarily just return a dummy strategy for Nature Oracle (before we implement the QP-based approach)
+        return CustomPolicy(self.sampled_nature_parameter_ranges[:,:,:,1], self.strat_ind)
 
-        self.strat_ind+=1
 
         # mpi_fork(args.cpu, is_cannon=args.cannon)  # run parallel code with mpi
 
@@ -491,7 +493,6 @@ class NatureOracle:
 
 
         # Instantiate environment
-
         env = self.env
         
         obs_dim = env.observation_dimension
@@ -514,11 +515,23 @@ class NatureOracle:
         act_dim_agent = ac.act_dim_agent
         act_dim_nature = ac.act_dim_nature
         obs_dim = ac.obs_dim
+        
+        o = env.reset()
+        o = o.reshape(-1)
 
         # Get count of agent actions
         agent_pol = wh_policy
+
+        with torch.no_grad():
+            a_nature_mu = ac.pi_nature.mu_net(torch.as_tensor(o, dtype=torch.float32))
+            a_nature_env_mu = ac.bound_nature_actions(a_nature_mu, state=o, reshape=True)
+
+        wh_policy.note_env(env)
+        wh_policy.learn(a_nature_env_mu)
+
         nature_pol = ac
-        #agent_counter = self.get_agent_counts(agent_pol, nature_pol, env, steps_per_epoch)
+        agent_counter = self.get_agent_counts(agent_pol, nature_pol, env, steps_per_epoch)
+        #sys.exit(0)
 
         # Sync params across processes
         sync_params(ac)
@@ -879,19 +892,19 @@ class NatureOracleMARL:
         if data == 'random':
             self.env_fn = lambda : RandomBanditEnv(N,S,A,B,seed,REWARD_BOUND)
 
-        if data == 'random_reset':
+        elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,B,seed,REWARD_BOUND)
 
-        if data == 'armman':
+        elif data == 'armman':
             self.env_fn = lambda : ARMMANRobustEnv(N,B,seed)
 
-        if data == 'circulant':
+        elif data == 'circulant':
             self.env_fn = lambda : CirculantDynamicsEnv(N,B,seed)
 
-        if data == 'counterexample':
+        elif data == 'counterexample':
             self.env_fn = lambda : CounterExampleRobustEnv(N,B,seed)
 
-        if data == 'sis':
+        elif data == 'sis':
             self.env_fn = lambda : SISRobustEnv(N,B,pop_size,seed)
 
         self.ma_actor_critic = core.RMABLambdaNatureOracle
@@ -919,7 +932,13 @@ class NatureOracleMARL:
         logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed, data_dir=data_dir)
         # logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed+add_to_seed, data_dir=data_dir)
 
-        return self.best_response_per_cpu(agent_strats, agent_eq, add_to_seed, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
+        # temporary fill-in
+        #print(self.sampled_nature_parameter_ranges)
+        #sys.exit(0)
+        #return np.zeros()
+        return(self.sampled_nature_parameter_ranges[0,:,:])
+
+        #return self.best_response_per_cpu(agent_strats, agent_eq, add_to_seed, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
 
     # add_to_seed is obsolete
     def best_response_per_cpu(self, agent_strats, agent_eq, add_to_seed, ma_actor_critic=core.RMABLambdaNatureOracle, ac_kwargs=dict(), 
