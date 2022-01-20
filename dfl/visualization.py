@@ -74,6 +74,9 @@ if args.plot:
 
     num_epochs= len(df_is_outputs[0][0][mode])-1 ## Last entry is the OPE if GT is perfectly known
 
+    random_metrics = [[ts_outputs[sd-args.seed][i][mode][-1] for i in range(3)] for sd in range(args.seed, args.seed+args.tr)]
+    random_mean, random_ste = np.mean(random_metrics, axis=0), np.std(random_metrics, axis=0) / np.sqrt(len(ts_outputs))
+    
     ### Loss figure
     plt.figure()
     
@@ -108,8 +111,8 @@ if args.plot:
     plt.plot(range(num_epochs), df_is_means, label='DF-IS')
     plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2)
     
-    plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
-    plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
+    # plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
+    # plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
     
     plt.plot(range(num_epochs), ts_means, label='TS')
     plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2)
@@ -156,8 +159,8 @@ if args.plot:
     plt.plot(range(num_epochs), df_is_means, label='DF-IS')
     plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2)
     
-    plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
-    plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
+    # plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
+    # plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
     
     plt.plot(range(num_epochs), ts_means, label='TS')
     plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2)
@@ -204,8 +207,8 @@ if args.plot:
     plt.plot(range(num_epochs), df_is_means, label='DF-IS')
     plt.fill_between(range(num_epochs), df_is_means-df_is_errors, df_is_means+df_is_errors, alpha=0.2)
     
-    plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
-    plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
+    # plt.plot(range(num_epochs), df_sim_means, label='DF-SIM')
+    # plt.fill_between(range(num_epochs), df_sim_means-df_sim_errors, df_sim_means+df_sim_errors, alpha=0.2)
     
     plt.plot(range(num_epochs), ts_means, label='TS')
     plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2)
@@ -237,18 +240,15 @@ if args.plot:
     df_sim_selected_epoch = np.argmax(df_sim_outputs[sd-args.seed][2]['val'][:-1]) # Maximize SIM OPE
     df_sim_selected_metrics.append([df_sim_outputs[sd-args.seed][i]['test'][df_sim_selected_epoch] for i in range(3)])
   
-  random_metrics = [[ts_outputs[sd-args.seed][i]['test'][-1] for i in range(3)] for sd in range(args.seed, args.seed+args.tr)]
-
   ts_selected_metrics=np.array(ts_selected_metrics)
   df_is_selected_metrics=np.array(df_is_selected_metrics)
   df_sim_selected_metrics=np.array(df_sim_selected_metrics)
 
-  random_test_mean, random_test_ste = np.mean(random_metrics, axis=0), np.std(random_metrics, axis=0) / np.sqrt(len(ts_outputs))
   ts_test_mean, ts_test_ste         = np.mean(ts_selected_metrics, axis=0), np.std(ts_selected_metrics, axis=0) / np.sqrt(len(ts_outputs))
   df_is_test_mean, df_is_test_ste   = np.mean(df_is_selected_metrics, axis=0), np.std(df_is_selected_metrics, axis=0) / np.sqrt(len(df_is_outputs))
   df_sim_test_mean, df_sim_test_ste = np.mean(df_sim_selected_metrics, axis=0), np.std(df_sim_selected_metrics, axis=0) / np.sqrt(len(df_sim_outputs))
 
-  print('Random test metrics mean (Loss/IS OPE/Sim OPE): {}, std: {}'.format(random_test_mean, random_test_ste)) # only valid after 0119
+  print('Random test metrics mean (Loss/IS OPE/Sim OPE): {}, std: {}'.format(random_mean, random_ste)) # only valid after 0119
   print('Two-stage test metrics mean (Loss/IS OPE/Sim OPE): {}, std: {}'.format(ts_test_mean, ts_test_ste))
   print('DF-IS test metrics mean (Loss/IS OPE/ Sim OPE): {}, std: {}'.format(df_is_test_mean, df_is_test_ste))
   print('DF-sim test metrics mean (Loss/IS OPE/Sim OPE): {}, std: {}'.format(df_sim_test_mean, df_sim_test_ste))

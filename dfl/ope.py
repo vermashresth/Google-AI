@@ -162,7 +162,7 @@ class opeSimulator(object):
         policy_id = policy_map[beh_policy_name]
         self.emp_T_data, self.emp_R_data = getEmpTransitionMatrix(traj=beh_traj, policy_id=policy_id, n_benefs=n_benefs, m=m, env=env, H=H, use_informed_prior=use_informed_prior)
         if env == 'general':
-            self.emp_T_data = T_data # Directly using the real T_data
+            # self.emp_T_data = T_data # Directly using the real T_data
             self.emp_R_data = R_data # Reward list is explicitly given in the MDP version
 
     def __call__(self, w, K):
