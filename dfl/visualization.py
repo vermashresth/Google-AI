@@ -256,7 +256,7 @@ if args.plot:
   df_is_test_mean, df_is_test_ste   = np.mean(df_is_selected_metrics, axis=0), np.std(df_is_selected_metrics, axis=0) / np.sqrt(len(df_is_outputs))
   df_sim_test_mean, df_sim_test_ste = np.mean(df_sim_selected_metrics, axis=0), np.std(df_sim_selected_metrics, axis=0) / np.sqrt(len(df_sim_outputs))
 
-  print('Random test metrics mean (Loss/IS OPE/Sim OPE): {}, std: {}'.format(random_mean, random_ste)) # only valid after 0119
-  print('Two-stage test metrics mean (Loss/IS OPE/Sim OPE): {}, std: {}'.format(ts_test_mean, ts_test_ste))
-  print('DF-IS test metrics mean (Loss/IS OPE/ Sim OPE): {}, std: {}'.format(df_is_test_mean, df_is_test_ste))
-  print('DF-sim test metrics mean (Loss/IS OPE/Sim OPE): {}, std: {}'.format(df_sim_test_mean, df_sim_test_ste))
+  print('Random test metrics mean (Loss/IS OPE/Sim OPE): ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$'.format(random_mean[0], random_ste[0], random_mean[1], random_ste[1], random_mean[2], random_ste[2])) # only valid after 0119
+  print('Two-stage test metrics mean (Loss/IS OPE/Sim OPE): ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$'.format(ts_test_mean[0], ts_test_ste[0], ts_test_mean[1], ts_test_ste[1], ts_test_mean[2], ts_test_ste[2]))
+  print('DF-IS test metrics mean (Loss/IS OPE/ Sim OPE): ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$'.format(df_is_test_mean[0], df_is_test_ste[0], df_is_test_mean[1], df_is_test_ste[1], df_is_test_mean[2], df_is_test_ste[2]))
+  print('DF-sim test metrics mean (Loss/IS OPE/Sim OPE): ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$, ${:.1f}\pm{:.1f}$'.format(df_sim_test_mean[0], df_sim_test_ste[0], df_sim_test_mean[1], df_sim_test_ste[1], df_sim_test_mean[2], df_sim_test_ste[2]))
