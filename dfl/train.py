@@ -136,7 +136,7 @@ if __name__ == '__main__':
                     ope_sim = ope_simulator(w, K)
                     # ope_sim = ope_simulator(tf.reshape(w, (n_benefs, n_full_states)))
                     if ope_mode == 'IS': # importance-sampling based OPE
-                        ess_weight = 1
+                        ess_weight = 0 # no ess weight. Purely CWPDIS
                         ope = ope_IS - ess_weight * tf.reduce_sum(1.0 / tf.math.sqrt(ess))
                     elif ope_mode == 'sim': # simulation-based OPE
                         ope = ope_sim
