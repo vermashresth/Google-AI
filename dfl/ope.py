@@ -95,12 +95,16 @@ def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K
     # OPE
     total_probs = np.ones((ntr, N))
     ope = 0
+    ess = 0
     for t in range(T-1):
         rewards = reward_record[:, 0, t, :] 
         total_probs = total_probs * IS_weights[:,t,:]
-        ope += rewards * total_probs * gamma_series[t]
+        IS_sum = tf.reduce_sum(IS_weights[:,t,:], axis=0, keepdims=True)
+        IS_square_sum = tf.reduce_sum(IS_weights[:,t,:]**2, axis=0, keepdims=True)
+        ope += rewards * total_probs * gamma_series[t] / IS_sum
+        ess += tf.reduce_sum((IS_sum ** 2) / IS_square_sum)
 
-    ope = tf.reduce_sum(ope) / ntr
+    ope = tf.reduce_sum(ope)
     return ope
 
 def opeISNaive(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
