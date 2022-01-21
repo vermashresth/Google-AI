@@ -98,14 +98,14 @@ def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K
     ess = 0
     for t in range(T-1):
         rewards = reward_record[:, 0, t, :] 
-        total_probs = total_probs * IS_weights[:,t,:]
-        IS_sum = tf.reduce_sum(IS_weights[:,t,:], axis=0, keepdims=True)
-        IS_square_sum = tf.reduce_sum(IS_weights[:,t,:]**2, axis=0, keepdims=True)
+        total_probs = total_probs * IS_weights[:,t,:] # shape: [n_trials, n_benefs]
+        IS_sum = tf.reduce_sum(total_probs, axis=0, keepdims=True) # shape: [1, n_benefs]
+        IS_square_sum = tf.reduce_sum(total_probs**2, axis=0, keepdims=True) # shape: [1, n_benefs]
         ope += rewards * total_probs * gamma_series[t] / IS_sum
-        ess += tf.reduce_sum(IS_sum ** 2) / tf.reduce_sum(IS_square_sum)
+        ess += IS_sum ** 2 / IS_square_sum # shape: [1, n_benefs]
 
     ope = tf.reduce_sum(ope)
-    return ope - 0.5 / tf.math.sqrt(ess)
+    return ope, ess
 
 def opeISNaive(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
     compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}

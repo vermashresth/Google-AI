@@ -36,7 +36,7 @@ if __name__ == '__main__':
     n_trials = 100
     L = 10
     K = 20
-    n_states = 2
+    n_states = 5
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
@@ -94,13 +94,14 @@ if __name__ == '__main__':
         for mode, dataset in dataset_list:
             loss_list = []
             ope_list = [] # OPE IS
+            ess_list = []
             ope_sim_list = [] # OPE simulation
             if mode == 'train':
                 dataset = tqdm.tqdm(dataset)
 
-            for (feature, label, raw_R_data, traj, ope_simulator, _, state_record, action_record, reward_record) in dataset:
+            for (feature, _, raw_R_data, traj, ope_simulator, _, state_record, action_record, reward_record) in dataset:
                 feature = tf.constant(feature, dtype=tf.float32)
-                label   = tf.constant(label, dtype=tf.float32)
+                # label   = tf.constant(label, dtype=tf.float32)
                 raw_R_data = tf.constant(raw_R_data, dtype=tf.float32)
 
                 with tf.GradientTape() as tape:
@@ -117,8 +118,7 @@ if __name__ == '__main__':
                         n_full_states = n_states * H
                     
                     # start_time = time.time()
-                    # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
-                    loss = twoStageNLLLoss(traj, T_data, beh_policy_name) - twoStageNLLLoss(traj, label, beh_policy_name) # Two-stage custom NLL loss
+                    loss = twoStageNLLLoss(traj, T_data, beh_policy_name) # - twoStageNLLLoss(traj, label, beh_policy_name) # Two-stage custom NLL loss
                     # print('two stage loss time:', time.time() - start_time)
 
                     # Batch Whittle index computation
@@ -131,12 +131,13 @@ if __name__ == '__main__':
                     # print('Whittle index time:', time.time() - start_time)
                     
                     # start_time = time.time()
-                    ope_IS = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
+                    ope_IS, ess = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
                             target_policy_name, beh_policy_name)
                     ope_sim = ope_simulator(w, K)
                     # ope_sim = ope_simulator(tf.reshape(w, (n_benefs, n_full_states)))
                     if ope_mode == 'IS': # importance-sampling based OPE
-                        ope = ope_IS
+                        ess_weight = 1
+                        ope = ope_IS - ess_weight * tf.reduce_sum(1.0 / tf.math.sqrt(ess))
                     elif ope_mode == 'sim': # simulation-based OPE
                         ope = ope_sim
                     else:
@@ -160,8 +161,9 @@ if __name__ == '__main__':
                 loss_list.append(loss)
                 ope_list.append(ope_IS)
                 ope_sim_list.append(ope_sim)
+                ess_list.append(tf.reduce_mean(ess))
 
-            print(f'Epoch {epoch}, {mode} mode, average loss {np.mean(loss_list)}, average ope (IS) {np.mean(ope_list)}, average ope (sim) {np.mean(ope_sim_list)}')
+            print(f'Epoch {epoch}, {mode} mode, average loss {np.mean(loss_list)}, average ope (IS) {np.mean(ope_list)}, average ope (sim) {np.mean(ope_sim_list)}, average ess {np.mean(ess_list)}')
             
             overall_loss[mode].append(np.mean(loss_list))
             overall_ope[mode].append(np.mean(ope_list))
