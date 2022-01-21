@@ -237,11 +237,11 @@ if args.plot:
   for sd in range(args.seed, args.seed+args.tr):
     # Two-stage selected epoch
     print (sd, len(ts_outputs))
-    ts_selected_epoch = np.argmin(ts_outputs[sd-args.seed][0]['val'][:-1]) # loss metric
+    ts_selected_epoch = -2 # np.argmin(ts_outputs[sd-args.seed][0]['val'][:-1]) # loss metric
     ts_selected_metrics.append([ts_outputs[sd-args.seed][i]['test'][ts_selected_epoch] for i in range(3)])
 
     # DF-IS selected epoch
-    df_is_selected_epoch = np.argmax(df_is_outputs[sd-args.seed][1]['val'][:-1]) # maximize IS OPE  metric
+    df_is_selected_epoch = -2 # np.argmax(df_is_outputs[sd-args.seed][1]['val'][:-1]) # maximize IS OPE  metric
     df_is_selected_metrics.append([df_is_outputs[sd-args.seed][i]['test'][df_is_selected_epoch] for i in range(3)])
 
     # DF-sim selected epoch
