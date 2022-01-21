@@ -85,19 +85,19 @@ class DoubleOracle:
         if data == 'random':
             self.env_fn = lambda : RandomBanditEnv(N,S,A,budget,seed,reward_bound)
 
-        if data == 'random_reset':
+        elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
 
-        if data == 'armman':
+        elif data == 'armman':
             self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed)
 
-        if data == 'circulant':
+        elif data == 'circulant':
             self.env_fn = lambda : CirculantDynamicsEnv(N,budget,seed)
 
-        if data == 'counterexample':
+        elif data == 'counterexample':
             self.env_fn = lambda : CounterExampleRobustEnv(N,budget,seed)
 
-        if data == 'sis':
+        elif data == 'sis':
             self.env_fn = lambda : SISRobustEnv(N,budget,pop_size,seed)
             self.nature_state_norm = 1
 
@@ -162,7 +162,7 @@ class DoubleOracle:
 
             add_to_seed = 0#self.n_cpu*n_epochs
 
-            # if first epoch, defender response is ideal defender for initial attractiveness
+            # in first epoch, defender response is ideal defender for initial attractiveness
             agent_br = self.agent_oracle.best_response(self.nature_strategies, nature_eq, add_to_seed)
             # self.update_payoffs_agent(agent_br)
             nature_br = self.nature_oracle.best_response(self.agent_strategies, agent_eq, add_to_seed)
@@ -172,6 +172,9 @@ class DoubleOracle:
             print('Nature BR: ', nature_br)
             print('#'*20)
             print()
+            dummy_o = np.zeros(self.N, dtype=int)
+            dummy_o = torch.as_tensor(dummy_o, dtype=torch.float32)
+            print('Nature action: ', nature_br.get_nature_action(dummy_o))
 
             add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
             self.update_payoffs(nature_br, agent_br, add_to_seed)
@@ -509,7 +512,7 @@ if __name__ == '__main__':
                             RandomNaturePolicy, PessimisticNaturePolicy, MiddleNaturePolicy, 
                             OptimisticNaturePolicy, DetermNaturePolicy
                         )
-    if args.data == 'sis':
+    elif args.data == 'sis':
         from robust_rmab.baselines.nature_baselines_sis import   (
                             RandomNaturePolicy, PessimisticNaturePolicy, MiddleNaturePolicy, 
                             OptimisticNaturePolicy
@@ -948,9 +951,12 @@ if __name__ == '__main__':
     print('saving model')
     model_dict = {'agent_eq': agent_eq, 'nature_eq': nature_eq,
                   'agent_strategies': do.agent_strategies[:-n_baseline_comparisons], 'nature_strategies': do.nature_strategies,
-                  'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret,
-                  'N':do.N, 'b':budget}
-    save_path = os.path.join(args.home_dir, f'logs/model_dump/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}')
-    with open(save_path, 'wb') as filename:
-        pickle.dump(model_dict, filename)
+                  'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret}
+    save_path = f'{args.home_dir}/logs/model_dump/'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    save_file = f'{save_path}/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}.pickle'
+
+    with open(save_file, 'wb') as f:
+        pickle.dump(model_dict, f)
                   

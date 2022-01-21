@@ -2,6 +2,22 @@ import numpy as np
 import itertools
 
 
+class CustomPolicy:
+    def __init__(self, actions, ind):
+        self.actions = actions
+        self.ind = ind
+        self.name = 'Custom_Policy'
+
+    def __repr__(self):
+        return f'{self.name}_{self.ind}'
+
+    def get_nature_action(self, o):
+        return self.actions
+
+    def bound_nature_actions(self, actions, state=None, reshape=True):
+        return actions
+
+
 # Don't use if you need deterministic (e.g., in main loop of double oracle)
 class RandomNaturePolicy:
     def __init__(self, nature_params, ind):
