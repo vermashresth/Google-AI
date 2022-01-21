@@ -1013,8 +1013,7 @@ class ARMMANRobustEnv(gym.Env):
         # Obtain placeholder Transition Probablity matrix, Reward function, Cost function
         self.T, self.R, self.C = self.get_experiment(self.n_clusters)
 
-        # No longer use this parameter
-        self.sampled_parameter_ranges = None 
+        self.sampled_parameter_ranges = self.sample_parameter_ranges() 
 
 
         self.seed(seed=seed)
