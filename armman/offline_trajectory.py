@@ -103,7 +103,7 @@ def get_offline_dataset(policy, T):
     raw_T_data = None
     raw_R_data = np.array([[0, 1]*all_n_benefs]).reshape(all_n_benefs, 2)
     R_data_ope_sim = np.array([[0, 1]*n_benefs]).reshape(n_benefs, 2)
-    ope_simulator = opeSimulator(offline_traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', R_data=R_data_ope_sim, env=env, H=H, use_informed_prior=True)
+    ope_simulator = opeSimulator(offline_traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', T_data=raw_T_data, R_data=R_data_ope_sim, env=env, H=H, use_informed_prior=True)
     simulated_rewards = None
 
     # Boolean array representing 0 or 1 if a beneficiary was every intervened in T timesteps

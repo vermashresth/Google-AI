@@ -123,10 +123,10 @@ if args.plot:
 
     plt.legend(fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
-    plt.ylabel('Intermediate Loss', fontsize=18)
-    plt.title(mode+' Loss comparison', fontsize=18)
+    plt.ylabel('Predictive Loss', fontsize=18)
+    # plt.title(mode+' Loss comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_loss.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_loss.pdf')
     plt.show()
 
     ### IS OPE figure
@@ -171,12 +171,13 @@ if args.plot:
 
     plt.hlines(random_mean[1], xmin=0, xmax=num_epochs, colors='#DB4437', lw=lw, linestyle='dashed', label='random')
     
-    plt.legend(fontsize=18)
+    plt.legend(bbox_to_anchor=(1, 0.3), loc='center right', fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
-    plt.ylabel('IS-OPE', fontsize=18)
-    plt.title(mode+' IS-OPE comparison', fontsize=18)
+    plt.ylabel('IS-based Evaluation', fontsize=18)
+    plt.ylim(bottom=318, top=350)
+    # plt.title(mode+' IS-OPE comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.pdf')
     plt.show()
 
     ### SIM-OPE figure
@@ -221,12 +222,13 @@ if args.plot:
 
     plt.hlines(random_mean[1], xmin=0, xmax=num_epochs, colors='#DB4437', lw=lw, linestyle='dashed', label='random')
     
-    plt.legend(fontsize=18)
+    plt.legend(bbox_to_anchor=(1, 0.3), loc='center right', fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
-    plt.ylabel('OPE-Sim', fontsize=18)
-    plt.title(mode+' Sim-OPE comparison', fontsize=18)
+    plt.ylabel('Simulation-based Evaluation', fontsize=18)
+    plt.ylim(bottom=318, top=350)
+    # plt.title(mode+' Sim-OPE comparison', fontsize=18)
     if args.save:
-        plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.png')
+        plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.pdf')
     plt.show()
 
 
