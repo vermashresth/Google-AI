@@ -23,7 +23,7 @@ if __name__ == '__main__':
     parser.add_argument('--env', default='general', type=str, help='general (MDP) or POMDP.')
     parser.add_argument('--data', default='synthetic', type=str, help='synthetic or pilot')
     parser.add_argument('--sv', default='.', type=str, help='save string name')
-    parser.add_argument('--epochs', default=10, type=int, help='num epochs')
+    parser.add_argument('--epochs', default=50, type=int, help='num epochs')
     parser.add_argument('--instances', default=10, type=int, help='num instances')
     parser.add_argument('--ope', default='sim', type=str, help='importance sampling (IS) or simulation-based (sim).')
     parser.add_argument('--seed', default=0, type=int, help='random seed for synthetic data generation.')
@@ -61,7 +61,7 @@ if __name__ == '__main__':
         K = int(225/n_instances)
         n_states = 2
         gamma = 0.99
-        full_dataset = get_offline_dataset(beh_policy_name, L)
+        full_dataset = get_offline_dataset(beh_policy_name, L, seed)
         # For offline data, seed must be set here
         np.random.seed(seed)
         random.seed(seed)
@@ -137,7 +137,7 @@ if __name__ == '__main__':
                     # ope_sim = ope_simulator(tf.reshape(w, (n_benefs, n_full_states)))
                     if ope_mode == 'IS': # importance-sampling based OPE
                         ess_weight = 0 # no ess weight. Purely CWPDIS
-                        ope = ope_IS - ess_weight * tf.reduce_sum(1.0 / tf.math.sqrt(ess))
+                        ope = ope_IS # - ess_weight * tf.reduce_sum(1.0 / tf.math.sqrt(ess))
                     elif ope_mode == 'sim': # simulation-based OPE
                         ope = ope_sim
                     else:
@@ -156,7 +156,6 @@ if __name__ == '__main__':
                     else:
                         raise NotImplementedError
                     optimizer.apply_gradients(zip(grad, model.trainable_variables))
-                del tape
 
                 loss_list.append(loss)
                 ope_list.append(ope_IS)

@@ -130,7 +130,7 @@ class DiffTopK(object):
     Based on the paper: https://proceedings.neurips.cc/paper/2020/file/ec24a54d62ce57ba93a531b460fa8d18-Paper.pdf
     """
 
-    def __init__(self, k, epsilon=0.1, max_iter=200):
+    def __init__(self, k, epsilon=0.5, max_iter=100):
         """Construct a Top-k Layer
         Args:v 
           k: 
@@ -178,9 +178,10 @@ class DiffTopK(object):
         compute = tf.custom_gradient(lambda x,y,z: self._compute(x,y,z))
         return compute(C, mu, nu)
 
-    def _compute(self, C, mu, nu):
+    def _compute(self, C_raw, mu, nu):
         bs, n = self.bs, self.n
         m = 2 # This is the dimensionality of the optimal transport. For top-k, m=2 to denote 2 categories of mass (top-k or not). For sorted top-k, m should be set larger.
+        C = tf.stop_gradient(C_raw)
 
         f = tf.zeros([bs, n, 1])
         g = tf.zeros([bs, 1, m])

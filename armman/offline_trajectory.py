@@ -1,4 +1,6 @@
+import random
 import numpy as np
+import tensorflow as tf
 import pandas as pd
 import pickle
 from dfl.config import policy_names, policy_map, dim_dict
@@ -87,7 +89,7 @@ def get_offline_traj(policy, T):
 
     return pol_features, offline_traj, state_matrix, action_matrix, reward_matrix
 
-def get_offline_dataset(policy, T):
+def get_offline_dataset(policy, T, seed=0):
     features, offline_traj, state_record, action_record, reward_record = get_offline_traj(policy, T)
     print('got offline traj')
     OPE_sim_n_trials = 100
@@ -106,10 +108,19 @@ def get_offline_dataset(policy, T):
     # ope_simulator = opeSimulator(offline_traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', T_data=raw_T_data, R_data=R_data_ope_sim, env=env, H=H, use_informed_prior=True)
     simulated_rewards = None
 
+    # Setting random seed
+    np.random.seed(seed)
+    random.seed(seed)
+    tf.random.set_seed(seed)
+
     # Boolean array representing 0 or 1 if a beneficiary was every intervened in T timesteps
     ever_intervened = (action_record[0, 0, :, :].sum(axis=0)>0).astype(bool)
     benef_idx_interv = np.arange(all_n_benefs)[ever_intervened]
     benef_idx_not_interv = np.arange(all_n_benefs)[~ever_intervened]
+
+    np.random.shuffle(benef_idx_interv)
+    np.random.shuffle(benef_idx_not_interv)
+
     dataset = []
     # break trajectories by beneficiries into n_instance
     for idx in range(n_instance):

@@ -200,6 +200,7 @@ class opeSimulator(object):
                 total_reward = tf.reduce_mean(tf.reduce_sum(cumulative_rewards[:,0,:,:] * selected_logprobs, axis=(1,2)))
 
             dtotal_dw = tmp_tape.gradient(total_reward, w)
+            del tmp_tape
 
             return dtotal_dw * dsoln
 

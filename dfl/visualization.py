@@ -174,7 +174,7 @@ if args.plot:
     plt.legend(bbox_to_anchor=(1, 0.3), loc='center right', fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
     plt.ylabel('IS-based Evaluation', fontsize=18)
-    plt.ylim(bottom=318, top=350)
+    # plt.ylim(bottom=318, top=350)
     # plt.title(mode+' IS-OPE comparison', fontsize=18)
     if args.save:
         plt.savefig('./figs/'+special+'_'+mode+'_OPE_IS.pdf')
@@ -225,7 +225,7 @@ if args.plot:
     plt.legend(bbox_to_anchor=(1, 0.3), loc='center right', fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
     plt.ylabel('Simulation-based Evaluation', fontsize=18)
-    plt.ylim(bottom=318, top=350)
+    # plt.ylim(bottom=318, top=350)
     # plt.title(mode+' Sim-OPE comparison', fontsize=18)
     if args.save:
         plt.savefig('./figs/'+special+'_'+mode+'_OPE_SIM.pdf')
