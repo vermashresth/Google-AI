@@ -21,6 +21,8 @@ class baseEnv:
     def takeActions(self, states, actions):
         # Vectorized multinomial for fast transitions
         def vec_multinomial(prob_matrix):
+            if np.isnan(prob_matrix.sum()):
+                raise
             s = prob_matrix.cumsum(axis=1)
             r = np.random.rand(prob_matrix.shape[0])
             k = (s < np.expand_dims(r, 1)).sum(axis=1)
