@@ -7,7 +7,7 @@ from dfl.config import policy_names, dim_dict, S_VALS, A_VALS
 from dfl.policy import getActions, getSoftActions
 from dfl.utils import getBenefsByCluster
 from dfl.environments import generalEnv
-
+from dfl.priors import clustered_prior
 # from armman.simulator import takeActions
 
 from collections import defaultdict
@@ -377,6 +377,7 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None, 
         emp_prob = np.zeros((n_states, n_actions, n_states))
         default_prob = np.ones((n_states, n_actions, n_states)) / n_states
         if use_informed_prior:
+            default_prob = np.full((n_states, n_actions, n_states), np.nan)
             # Do not just use uniform prior. Use informed prior using population level transitions
             all_transitions_df = getBenefsFullFrequency(traj, list(range(n_benefs)), policy_id)
             for s in range(n_states):
@@ -391,7 +392,14 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None, 
                         s_a_s_prime_count = s_a_s_prime.shape[0]
                         if s_a_count >= 1:
                             default_prob[s,a,s_prime] = s_a_s_prime_count / s_a_count
-        
+            # Use clustered prior
+            clustered_default_prob = clustered_prior(traj, n_clusters=10, policy_id=policy_id)
+            for s in range(n_states):
+                for a in range(n_actions):
+                    for s_prime in range(n_states):
+                        clustered_default_prob[:, s, a, s_prime][np.isnan(clustered_default_prob[:, s, a, s_prime])] = default_prob[s,a,s_prime]
+            default_prob = clustered_default_prob
+
     elif env == 'POMDP':
         n_states = m * H
         assert(H is not None)
@@ -417,7 +425,10 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None, 
 
     for benef_id in range(n_benefs):
         transitions_df = getBenefsFullFrequency(traj, [benef_id], policy_id)
-        transition_prob = default_prob.copy()
+        if use_informed_prior:
+            transition_prob = default_prob[benef_id].copy()
+        else:
+            transition_prob = default_prob.copy()
 
         for s in range(n_states):
             if len(transitions_df[transitions_df['s'] == s]) > 0:
