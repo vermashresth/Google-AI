@@ -48,7 +48,7 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
         raw_T_data = generateRandomTMatrix(n_benefs, n_states=n_states, R_data=R) # numpy array
         
         # Generate features using the transition probabilities
-        noise_level = 0.1
+        # noise_level = 0.1
         feature = model(tf.constant(raw_T_data.reshape(-1,2*n_states*n_states), dtype=tf.float32))
         # print(tf.norm(feature, axis=1))
         # feature = feature + tf.random.normal(shape=(n_benefs, 16,)) * noise_level
