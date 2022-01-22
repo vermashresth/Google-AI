@@ -103,7 +103,7 @@ def get_offline_dataset(policy, T):
     raw_T_data = None
     raw_R_data = np.array([[0, 1]*all_n_benefs]).reshape(all_n_benefs, 2)
     R_data_ope_sim = np.array([[0, 1]*n_benefs]).reshape(n_benefs, 2)
-    ope_simulator = opeSimulator(offline_traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', T_data=raw_T_data, R_data=R_data_ope_sim, env=env, H=H, use_informed_prior=True)
+    # ope_simulator = opeSimulator(offline_traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', T_data=raw_T_data, R_data=R_data_ope_sim, env=env, H=H, use_informed_prior=True)
     simulated_rewards = None
 
     # Boolean array representing 0 or 1 if a beneficiary was every intervened in T timesteps
@@ -118,9 +118,11 @@ def get_offline_dataset(policy, T):
         interv_idx = list(benef_idx_interv[idx*n_benefs_interv:(idx+1)*n_benefs_interv])
         not_interv_idx = list(benef_idx_not_interv[idx*n_benefs_not_interv:(idx+1)*n_benefs_not_interv])
         all_idx = interv_idx+not_interv_idx
+        ope_simulator_subset = opeSimulator(offline_traj[:, :, :, :, all_idx], n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', T_data=raw_T_data, R_data=R_data_ope_sim, env=env, H=H, use_informed_prior=True)
+
         instance = (features[all_idx], raw_T_data,
                     raw_R_data[all_idx],
-                    offline_traj[:, :, :, :, all_idx], ope_simulator, simulated_rewards,
+                    offline_traj[:, :, :, :, all_idx], ope_simulator_subset, simulated_rewards,
                     state_record[:, :, :, all_idx],
                     action_record[:, :, :, all_idx],
                     reward_record[:, :, :, all_idx])
