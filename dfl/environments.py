@@ -3,7 +3,7 @@ import numpy as np
 from dfl.utils import getSoftTopk
 from armman.simulator import getTopk
 
-EPS = 1e-6
+EPS = 1e-4
 
 class baseEnv:
     def __init__(self, N, T_data, R_data, n_states, n_actions):
@@ -117,6 +117,9 @@ def POMDP2MDP(T_data, R_data, H):
 
     new_T_data = tf.concat([passive_T_data, active_T_data], axis=2)
     new_R_data = tf.reshape(tf.concat(R_data_list, axis=2), (N, m*H))
+
+    # if not (np.all(np.sum(new_T_data, axis=-1) > np.ones((N, m*H, 2)) - EPS) and np.all(np.sum(new_T_data, axis=-1) < np.ones((N, m*H, 2)) + EPS)):
+    #     print(np.sum(new_T_data, axis=-1))
 
     assert(np.all(np.sum(new_T_data, axis=-1) > np.ones((N, m*H, 2)) - EPS) \
             and np.all(np.sum(new_T_data, axis=-1) < np.ones((N, m*H, 2)) + EPS))

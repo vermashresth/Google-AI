@@ -95,13 +95,17 @@ def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K
     # OPE
     total_probs = np.ones((ntr, N))
     ope = 0
+    ess = 0
     for t in range(T-1):
         rewards = reward_record[:, 0, t, :] 
-        total_probs = total_probs * IS_weights[:,t,:]
-        ope += rewards * total_probs * gamma_series[t]
+        total_probs = total_probs * IS_weights[:,t,:] # shape: [n_trials, n_benefs]
+        IS_sum = tf.reduce_sum(total_probs, axis=0, keepdims=True) # shape: [1, n_benefs]
+        IS_square_sum = tf.reduce_sum(total_probs**2, axis=0, keepdims=True) # shape: [1, n_benefs]
+        ope += rewards * total_probs * gamma_series[t] / IS_sum
+        ess += IS_sum ** 2 / IS_square_sum # shape: [1, n_benefs]
 
-    ope = tf.reduce_sum(ope) / ntr
-    return ope
+    ope = tf.reduce_sum(ope)
+    return ope, ess
 
 def opeISNaive(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
     compare = {'target':policy_map[target_policy_name], 'beh':policy_map[beh_policy_name]}
@@ -151,7 +155,7 @@ def opeISNaive(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh
 
 # Simulation-based OPE (differentiable and parallelizable)
 class opeSimulator(object):
-    def __init__(self, beh_traj, n_benefs, T, m, OPE_sim_n_trials, gamma, beh_policy_name, R_data, env='general', H=None, use_informed_prior=False):
+    def __init__(self, beh_traj, n_benefs, T, m, OPE_sim_n_trials, gamma, beh_policy_name, T_data, R_data, env='general', H=None, use_informed_prior=False):
         self.n_benefs = n_benefs
         self.T = T
         self.m = m
@@ -162,6 +166,7 @@ class opeSimulator(object):
         policy_id = policy_map[beh_policy_name]
         self.emp_T_data, self.emp_R_data = getEmpTransitionMatrix(traj=beh_traj, policy_id=policy_id, n_benefs=n_benefs, m=m, env=env, H=H, use_informed_prior=use_informed_prior)
         if env == 'general':
+            # self.emp_T_data = T_data # Directly using the real T_data
             self.emp_R_data = R_data # Reward list is explicitly given in the MDP version
 
     def __call__(self, w, K):

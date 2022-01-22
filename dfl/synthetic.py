@@ -39,16 +39,19 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
 
     # Generating synthetic data
     for i in range(n_instances):
-        # Generate transition probabilities
-        raw_T_data = generateRandomTMatrix(n_benefs, n_states=n_states) # numpy array
-
         # Generate rewards from uniform distribution
-        R = sorted(np.random.uniform(size=n_states))
+        R = np.arange(n_states) # sorted(np.random.uniform(size=n_states))
         R = (R - np.min(R)) / np.ptp(R) # normalize rewards
         raw_R_data = np.repeat(R.reshape(1,-1), n_benefs, axis=0) # using the same rewards across all arms (for simplicity)
 
+        # Generate transition probabilities
+        raw_T_data = generateRandomTMatrix(n_benefs, n_states=n_states, R_data=R) # numpy array
+        
         # Generate features using the transition probabilities
+        noise_level = 0.1
         feature = model(tf.constant(raw_T_data.reshape(-1,2*n_states*n_states), dtype=tf.float32))
+        # print(tf.norm(feature, axis=1))
+        # feature = feature + tf.random.normal(shape=(n_benefs, 16,)) * noise_level
 
         # Generate environment parameters
         if env=='general':
@@ -91,7 +94,7 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
         # This part takes the longest preprocessing time.
         # start_time = time.time()
         OPE_sim_n_trials = 100
-        ope_simulator = opeSimulator(traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', R_data=R_data, env=env, H=H)
+        ope_simulator = opeSimulator(traj, n_benefs, L, n_states, OPE_sim_n_trials, gamma, beh_policy_name='random', T_data=T_data, R_data=R_data, env=env, H=H)
         # print('Initializing simulator time', time.time() - start_time)
 
         # print('real T data:', T_data[0])

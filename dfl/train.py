@@ -24,21 +24,23 @@ if __name__ == '__main__':
     parser.add_argument('--data', default='synthetic', type=str, help='synthetic or pilot')
     parser.add_argument('--sv', default='.', type=str, help='save string name')
     parser.add_argument('--epochs', default=10, type=int, help='num epochs')
-    parser.add_argument('--instances', default=50, type=int, help='num instances')
-    parser.add_argument('--ope', default='IS', type=str, help='importance sampling (IS) or simulation-based (sim).')
+    parser.add_argument('--instances', default=10, type=int, help='num instances')
+    parser.add_argument('--ope', default='sim', type=str, help='importance sampling (IS) or simulation-based (sim).')
     parser.add_argument('--seed', default=0, type=int, help='random seed for synthetic data generation.')
+  
 
     args = parser.parse_args()
     print('argparser arguments', args)
-
+    print ("OPE SETTING IS: ", args.ope)
     n_benefs = 100
-    n_trials = 10
+    n_trials = 100
     L = 10
     K = 20
-    n_states = 2
+    n_states = 5
     gamma = 0.99
     target_policy_name = 'soft-whittle'
     beh_policy_name    = 'random'
+    TS_WEIGHT=0.1
 
     # Environment setup
     env = args.env
@@ -92,12 +94,14 @@ if __name__ == '__main__':
         for mode, dataset in dataset_list:
             loss_list = []
             ope_list = [] # OPE IS
+            ess_list = []
             ope_sim_list = [] # OPE simulation
             if mode == 'train':
                 dataset = tqdm.tqdm(dataset)
 
             for (feature, _, raw_R_data, traj, ope_simulator, _, state_record, action_record, reward_record) in dataset:
                 feature = tf.constant(feature, dtype=tf.float32)
+                # label   = tf.constant(label, dtype=tf.float32)
                 raw_R_data = tf.constant(raw_R_data, dtype=tf.float32)
 
                 with tf.GradientTape() as tape:
@@ -114,8 +118,7 @@ if __name__ == '__main__':
                         n_full_states = n_states * H
                     
                     # start_time = time.time()
-                    # loss = tf.reduce_sum((label - prediction)**2) # Two-stage loss
-                    loss = twoStageNLLLoss(traj, T_data, beh_policy_name) # Two-stage custom NLL loss
+                    loss = twoStageNLLLoss(traj, T_data, beh_policy_name) # - twoStageNLLLoss(traj, label, beh_policy_name) # Two-stage custom NLL loss
                     # print('two stage loss time:', time.time() - start_time)
 
                     # Batch Whittle index computation
@@ -123,22 +126,25 @@ if __name__ == '__main__':
                     # w = whittleIndex(prediction)
                     w = newWhittleIndex(T_data, R_data)
                     w = tf.reshape(w, (n_benefs, n_full_states))
+                    if epoch == total_epoch:
+                        w = tf.zeros((n_benefs, n_full_states))
                     # print('Whittle index time:', time.time() - start_time)
                     
                     # start_time = time.time()
-                    ope_IS = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
+                    ope_IS, ess = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
                             target_policy_name, beh_policy_name)
                     ope_sim = ope_simulator(w, K)
                     # ope_sim = ope_simulator(tf.reshape(w, (n_benefs, n_full_states)))
                     if ope_mode == 'IS': # importance-sampling based OPE
-                        ope = ope_IS
+                        ess_weight = 0 # no ess weight. Purely CWPDIS
+                        ope = ope_IS - ess_weight * tf.reduce_sum(1.0 / tf.math.sqrt(ess))
                     elif ope_mode == 'sim': # simulation-based OPE
                         ope = ope_sim
                     else:
                         raise NotImplementedError
                     # print('Evaluation time:', time.time() - start_time)
 
-                    ts_weight = 0.1
+                    ts_weight = TS_WEIGHT
                     performance = -ope * (1 - ts_weight) + loss * ts_weight
 
                 # backpropagation
@@ -155,8 +161,9 @@ if __name__ == '__main__':
                 loss_list.append(loss)
                 ope_list.append(ope_IS)
                 ope_sim_list.append(ope_sim)
+                ess_list.append(tf.reduce_mean(ess))
 
-            print(f'Epoch {epoch}, {mode} mode, average loss {np.mean(loss_list)}, average ope (IS) {np.mean(ope_list)}, average ope (sim) {np.mean(ope_sim_list)}')
+            print(f'Epoch {epoch}, {mode} mode, average loss {np.mean(loss_list)}, average ope (IS) {np.mean(ope_list)}, average ope (sim) {np.mean(ope_sim_list)}, average ess {np.mean(ess_list)}')
             
             overall_loss[mode].append(np.mean(loss_list))
             overall_ope[mode].append(np.mean(ope_list))
