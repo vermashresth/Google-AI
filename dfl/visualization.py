@@ -13,6 +13,7 @@ parser=argparse.ArgumentParser(description = 'Visulation and tuning DF vs TS com
 parser.add_argument('--epochs', default=10, type=int, help='Number of epochs')
 parser.add_argument('--instances', default=10, type=int, help='Number of instances')
 parser.add_argument('--seed', default=0, type=int, help='Random seed')
+parser.add_argument('--data', default='synthetic', type=str, help='synthetic or pilot')
 parser.add_argument('--save', default=0, type=int, help='Whether or not to save all generated figs. Put 0 for False, 1 for True')
 parser.add_argument('--plot', default=0, type=int, help='Whether or not to create plots. Put 0 for False, 1 for True')
 parser.add_argument('--compute', default=0, type=int, help='Whether or not to run new experiments. Put 0 for False, 1 for True')
@@ -39,11 +40,11 @@ if args.compute:
 
     print ('Starting seed: ', sd)
     print ('Starting DF Importance Sampling to be saved as: '+DF_IS_filename)
-    subprocess.run(f'python3 train.py --method DF --sv {DF_IS_filename} --epochs {args.epochs} --instances {args.instances} --seed {sd} --ope {"IS"}', shell=True)
+    subprocess.run(f'python3 train.py --method DF --sv {DF_IS_filename} --epochs {args.epochs} --data {args.data} --instances {args.instances} --seed {sd} --ope {"IS"}', shell=True)
     # print ('Starting DF Simu based to be saved as: '+DF_SIM_filename)
-    # subprocess.run(f'python3 train.py --method DF --sv {DF_SIM_filename} --epochs {args.epochs} --instances {args.instances} --seed {sd} --ope {"sim"}', shell=True)
+    # subprocess.run(f'python3 train.py --method DF --sv {DF_SIM_filename} --epochs {args.epochs} --data {args.data} --instances {args.instances} --seed {sd} --ope {"sim"}', shell=True)
     print ('Starting TS to be saved as: '+TS_filename)
-    subprocess.run(f'python3 train.py --method TS --sv {TS_filename} --epochs {args.epochs} --instances {args.instances} --seed {sd}', shell=True)
+    subprocess.run(f'python3 train.py --method TS --sv {TS_filename} --epochs {args.epochs} --data {args.data} --instances {args.instances} --seed {sd}', shell=True)
     print ('ALL THREE DONE')
 
 
