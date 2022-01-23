@@ -97,14 +97,15 @@ def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K
     ope = 0
     ess = 0
     for t in range(T-1):
-        rewards = reward_record[:, 0, t, :]
         if not single_trajectory:
+            rewards = reward_record[:, 0, t, :]
             total_probs = IS_weights[:,t,:] * total_probs # shape: [n_trials, n_benefs]
             IS_sum = tf.reduce_sum(total_probs, axis=0) # shape: [1, n_benefs]
             IS_square_sum = tf.reduce_sum(total_probs**2, axis=0) #/ n_benefs # shape: [1, n_benefs]
             ope += rewards * total_probs * gamma_series[t] # / IS_sum
             ess += IS_sum ** 2 / IS_square_sum # shape: [1, n_benefs]
         else:
+            rewards = reward_record[:, 0, t, :]
             IS_sum = tf.reduce_mean(IS_weights[:,:T-1,:], axis=1) # Average IS of one trajectory with shape: [n_trials=1, n_benefs]
             IS_square_sum = tf.reduce_mean(IS_weights[:,:T-1,:]**2, axis=1) # shape: [n_trails=1, n_benefs]
             ope += rewards * IS_weights[:,t,:] / IS_sum * gamma_series[t]
