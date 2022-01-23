@@ -77,7 +77,8 @@ if args.plot:
 
     random_metrics = [[ts_outputs[sd-args.seed][i][mode][0] for i in range(3)] for sd in range(args.seed, args.seed+args.tr)]
     random_mean, random_ste = np.mean(random_metrics, axis=0), np.std(random_metrics, axis=0) / np.sqrt(len(ts_outputs))
-    
+    print(random_mean)
+
     ### Loss figure
     plt.figure()
     
@@ -221,7 +222,7 @@ if args.plot:
     plt.plot(range(num_epochs), ts_means, label='TS', color='#F4B400', lw=lw)
     plt.fill_between(range(num_epochs), ts_means-ts_errors, ts_means+ts_errors, alpha=0.2, color='#F4B400')
 
-    plt.hlines(random_mean[1], xmin=0, xmax=num_epochs, colors='#DB4437', lw=lw, linestyle='dashed', label='random')
+    plt.hlines(random_mean[2], xmin=0, xmax=num_epochs, colors='#DB4437', lw=lw, linestyle='dashed', label='random')
     
     plt.legend(bbox_to_anchor=(1, 0.3), loc='center right', fontsize=18)
     plt.xlabel('Epochs', fontsize=18)
