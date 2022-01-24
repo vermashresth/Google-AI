@@ -19,7 +19,7 @@ class CustomPolicy:
 
 
 # Don't use if you need deterministic (e.g., in main loop of double oracle)
-class RandomNaturePolicy:
+class RandomNaturePolicyIndividual:
     def __init__(self, nature_params, ind):
         self.nature_params=nature_params
         self.ind = ind
@@ -63,6 +63,50 @@ class RandomNaturePolicy:
 
         return policy_array, tup_to_ind
 
+# Don't use if you need deterministic (e.g., in main loop of double oracle)
+class RandomNaturePolicy:
+    def __init__(self, nature_params, ind):
+        self.nature_params=nature_params
+        self.ind = ind
+        self.name="Random_Nature"
+
+    def __repr__(self):
+        return "%s_%i"%(self.name, self.ind)
+
+    def get_nature_action(self, o):
+        actions = np.zeros((self.nature_params.shape[0],self.nature_params.shape[1], self.nature_params.shape[2]))
+        
+        for arm_i in range(actions.shape[0]):
+            for arm_s in range(actions.shape[1]):
+                for arm_a in range(actions.shape[2]):
+                    param_lower = self.nature_params[arm_i, arm_s, arm_a, 0]
+                    param_upper = self.nature_params[arm_i, arm_s, arm_a, 1]
+                    actions[arm_i, arm_s, arm_a] = np.random.rand()*(param_upper-param_lower)+ param_lower
+
+        return actions
+
+    def bound_nature_actions(self, actions, state=None, reshape=True):
+        return actions
+
+    # we'll just settle for getting one sample from each...
+    def get_policy_array(self, state_dim=0, N=0):
+
+        N = self.nature_params.shape[0]
+        S = self.nature_params.shape[1]
+        A = self.nature_params.shape[2]
+
+        all_states = list(itertools.product(np.arange(S), repeat=N))
+
+        policy_array = np.zeros((len(all_states),N*A),dtype=float)
+
+        tup_to_ind = dict(zip(all_states,np.arange(len(all_states))))
+
+        all_states = np.array(all_states)
+
+        for i, state in enumerate(all_states):
+            policy_array[i] = self.get_nature_action(state).reshape(-1)
+
+        return policy_array, tup_to_ind
 
 class PessimisticNaturePolicyIndividual:
     def __init__(self, nature_params, ind):
