@@ -951,12 +951,20 @@ if __name__ == '__main__':
     print('saving model')
     model_dict = {'agent_eq': agent_eq, 'nature_eq': nature_eq,
                   'agent_strategies': do.agent_strategies[:-n_baseline_comparisons], 'nature_strategies': do.nature_strategies,
-                  'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret}
-    save_path = f'{args.home_dir}/logs/model_dump/'
+                  'agent_baselines':
+                                    {'optimist':baseline_optimistic_rl,
+                                     'pessimist':baseline_pessimistic_rl,
+                                     'middle':baseline_middle_rl,
+                                     'random':baseline_random_agent
+                                    },
+                  'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret,
+                  'N': do.N, 'b':budget}
+    save_path = f'{args.home_dir}/logs/model_dump'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     save_file = f'{save_path}/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}.pickle'
 
     with open(save_file, 'wb') as f:
+        print('Saving model at ', save_file)
         pickle.dump(model_dict, f)
                   
