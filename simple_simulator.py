@@ -11,7 +11,7 @@ from robust_rmab.baselines.nature_baselines_armman import   (
                         )
                     
 def simulate_reward(agent_strats, agent_eq, nature_strats, nature_eq, env, seed=0, 
-            steps_per_epoch=100, epochs=100, gamma=0.99):
+            steps_per_epoch=10, epochs=20, gamma=0.99):
         '''
         Given an agent pol and nature policy, we simulate the interaction for steps_per_epoch timesteps,
         and average the reward over `epochs` number of simulations
@@ -91,22 +91,34 @@ if __name__=="__main__":
     args = parser.parse_args()
 
     rl_info = {
-        'model_file_path_rmab_wh': '/Users/vermashresth/Documents/Google-AI-RobustClusterRMAB/logs/model_dump/setup_test_n10_b5.0_h10_epoch1_dataarmman_seed0'
+        'model_file_path_rmab_wh': './logs/model_dump/setup_test_n10_b5.0_h10_epoch1_dataarmman_seed0.pickle'
     }
 
     model_dict = load_wh_model_dict(rl_info['model_file_path_rmab_wh'])
-    N, b, seed = 10, 5, 0
-    # N, b, seed = model_dict['N'], model_dict['b'], args.seed_base
+
+    N, b, seed = model_dict['N'], model_dict['b'], args.seed_base
     env = ARMMANRobustEnv(N, b, seed)
 
-    agent_strats, agent_eq = model_dict['agent_strategies'], model_dict['agent_eq']
+    agent_opponents = []
+    do_agent_strats, do_agent_eq = model_dict['agent_strategies'], model_dict['agent_eq']
+    agent_opponents.append(('Double Oracle Agent', do_agent_strats, do_agent_eq))
+    agent_opponents.append(('Baseline Optimist Agent', [model_dict['agent_baselines']['optimist']], [1]))
+    agent_opponents.append(('Baseline Pessimist Agent', [model_dict['agent_baselines']['pessimist']], [1]))
+    agent_opponents.append(('Baseline Middle Agent', [model_dict['agent_baselines']['middle']], [1]))
+    agent_opponents.append(('Baseline Random Agent', [model_dict['agent_baselines']['random']], [1]))
+
+    nature_opponents = []
+    do_nature_strats, do_nature_eq = model_dict['nature_strategies'], model_dict['nature_eq']
+    nature_opponents.append(('Double Oracle Nature', do_nature_strats, do_nature_eq))
+    nature_opponents.append(('Mid Nature', [MiddleNaturePolicy(env.sampled_parameter_ranges, 0)], [1]))
+    nature_opponents.append(('Random Nature', [RandomNaturePolicy(env.sampled_parameter_ranges, 0)], [1]))
     
-    if args.nature=='mixed':
-        nature_strats, nature_eq = model_dict['nature_strategies'], model_dict['nature_eq']
-    if args.nature == 'mid':
-        nature_strats = [MiddleNaturePolicy(env.sampled_parameter_ranges, 0)]
-        nature_eq = [1]
-    if args.nature == 'random':
-        nature_strats = [SampledRandomNaturePolicy(env.sampled_parameter_ranges, 0)]
-        nature_eq = [1]
-    simulate_reward(agent_strats, agent_eq, nature_strats, nature_eq, env)
+    for nat_op in nature_opponents:
+        for agent_op in agent_opponents:
+            print(f'{agent_op[0]} vs {nat_op[0]}')
+            rew, _ = simulate_reward(agent_strats=agent_op[1], agent_eq=agent_op[2],
+                            nature_strats=nat_op[1], nature_eq=nat_op[2],
+                            env=env)
+            
+            print(rew)
+            print()
