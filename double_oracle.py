@@ -25,7 +25,7 @@ from robust_rmab.nfg_solver import solve_minimax_regret, get_payoff, solve_minim
 from robust_rmab.environments.bandit_env_robust import CounterExampleRobustEnv, ARMMANRobustEnv, SISRobustEnv
 
 from robust_rmab.baselines.agent_baselines import   (
-                            PessimisticAgentPolicy, RandomAgentPolicy
+                            NoActionAgentPolicy, RandomAgentPolicy
                         )
 
 from robust_rmab.baselines.nature_baselines_armman import   (
@@ -134,12 +134,16 @@ class DoubleOracle:
         self.payoffs           = [] # agent regret for each (agent strategy, nature strategy) combo
         self.fairness          = []
 
+        add_to_seed = 0
         strat_type_ind = 0
-        pess_agent_pol = PessimisticAgentPolicy(self.N, strat_type_ind)
+        pess_agent_pol, _ = use_pessimist(self, add_to_seed, strat_type_ind)
 
         # init the payoff matrix
-        add_to_seed = 0
         self.update_payoffs_agent(pess_agent_pol, add_to_seed)
+
+        strat_type_ind += 1
+        no_action_agent_pol = NoActionAgentPolicy(self.N, strat_type_ind)
+        self.update_payoffs_agent(no_action_agent_pol, add_to_seed)
 
         
 
@@ -329,7 +333,7 @@ def use_middle(do, add_to_seed, ind, perturbations=None, perturbation_size=0.1):
     middle_nature_policy = MiddleNaturePolicy(do.sampled_nature_parameter_ranges, ind, 
                             perturbations=perturbations, perturbation_size=perturbation_size)
     agent_br = do.agent_oracle.best_response([middle_nature_policy], [1.], add_to_seed)
-    return agent_br
+    return agent_br, middle_nature_policy
 
 def use_pessimist(do, add_to_seed, ind):
     """ solve optimal reward relative to midpoint of uncertainty interval
@@ -337,7 +341,7 @@ def use_pessimist(do, add_to_seed, ind):
 
     pessimistic_nature_policy = PessimisticNaturePolicy(do.sampled_nature_parameter_ranges, ind)
     agent_br = do.agent_oracle.best_response([pessimistic_nature_policy], [1.], add_to_seed)
-    return agent_br
+    return agent_br, pessimistic_nature_policy
 
 def use_optimistic(do, add_to_seed, ind):
     """ solve optimal reward relative to midpoint of uncertainty interval
@@ -345,7 +349,7 @@ def use_optimistic(do, add_to_seed, ind):
 
     optimistic_nature_policy = OptimisticNaturePolicy(do.sampled_nature_parameter_ranges, ind)
     agent_br = do.agent_oracle.best_response([optimistic_nature_policy], [1.], add_to_seed)
-    return agent_br
+    return agent_br, optimistic_nature_policy
 
 
 def use_random(do, add_to_seed, ind):
@@ -354,7 +358,8 @@ def use_random(do, add_to_seed, ind):
 
     random_nature_policy = RandomNaturePolicy(do.sampled_nature_parameter_ranges, ind)
     agent_br = do.agent_oracle.best_response([random_nature_policy], [1.], add_to_seed)
-    return agent_br
+
+    return agent_br, random_nature_policy
 
 
 
@@ -420,6 +425,7 @@ if __name__ == '__main__':
     parser.add_argument('--nature_train_pi_iters', type=int, default=20, help="Training iterations to run per epoch")
     parser.add_argument('--nature_train_vf_iters', type=int, default=20, help="Training iterations to run per epoch")
     parser.add_argument('--nature_lamb_update_freq', type=int, default=4, help="Number of epochs that should pass before updating the lambda network (so really it is a period, not frequency)")
+    parser.add_argument('--gurobi_time_limit', type=int, default=10, help="Gurobi max solve time (in sec)")
     parser.add_argument('--no_hawkins', type=int, default=0, help="If set, will not run Hawkins baselines")
 
     parser.add_argument('--home_dir', type=str, default='.', help="Home directory for experiments")
@@ -481,6 +487,7 @@ if __name__ == '__main__':
     nature_kwargs['lamb_update_freq'] = args.nature_lamb_update_freq
     nature_kwargs['ac_kwargs'] = dict(hidden_sizes=[args.hid]*args.l)
     nature_kwargs['gamma'] = args.gamma
+    nature_kwargs['gurobi_time_limit'] = args.gurobi_time_limit
 
     horizon = args.horizon#int(args.agent_steps/args.cpu)
     N=args.N
@@ -624,7 +631,7 @@ if __name__ == '__main__':
     n_baseline_comparisons = 0
 
     # Plan against middle nature
-    baseline_middle_rl_i = len(do.agent_strategies)
+    baseline_middle_wi_i = len(do.agent_strategies)
     for i in range(n_perturb):
         
         add_to_seed = 0#max_epochs_double_oracle + i + 0*n_perturb
@@ -634,14 +641,14 @@ if __name__ == '__main__':
         
         perturbations = np.random.rand(*shape)
         print('Planning Agent BR against Middle Nature')
-        baseline_middle_rl = use_middle(do, add_to_seed, i, perturbations=perturbations, perturbation_size=args.perturbation_size)
+        baseline_middle_wi, middle_nature_policy = use_middle(do, add_to_seed, i, perturbations=perturbations, perturbation_size=args.perturbation_size)
         print('Learning Nature BR')
-        nature_br = do.nature_oracle.best_response([baseline_middle_rl], [1.0], add_to_seed)
+        nature_br = do.nature_oracle.best_response([baseline_middle_wi], [1.0], [middle_nature_policy], [1.0])
         add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
-        do.update_payoffs(nature_br, baseline_middle_rl, add_to_seed)
+        do.update_payoffs(nature_br, baseline_middle_wi, add_to_seed)
         n_baseline_comparisons+=1
 
-    baseline_pessimistic_rl_i = len(do.agent_strategies)
+    baseline_pessimistic_wi_i = len(do.agent_strategies)
     for i in range(n_perturb):
         add_to_seed = 0#max_epochs_double_oracle + i + 0*n_perturb
         
@@ -650,14 +657,14 @@ if __name__ == '__main__':
         
         perturbations = np.random.rand(*shape)
         print('Planning Agent BR against Pessimist Nature')
-        baseline_pessimistic_rl = use_pessimist(do, add_to_seed, i)
+        baseline_pessimistic_wi, pessimistic_nature_policy = use_pessimist(do, add_to_seed, i)
         print('Learning Nature BR')
-        nature_br = do.nature_oracle.best_response([baseline_pessimistic_rl], [1.0], add_to_seed)
+        nature_br = do.nature_oracle.best_response([baseline_pessimistic_wi], [1.0], [pessimistic_nature_policy], [1.0])
         add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
-        do.update_payoffs(nature_br, baseline_pessimistic_rl, add_to_seed)
+        do.update_payoffs(nature_br, baseline_pessimistic_wi, add_to_seed)
         n_baseline_comparisons+=1
     
-    baseline_optimistic_rl_i = len(do.agent_strategies)
+    baseline_optimistic_wi_i = len(do.agent_strategies)
     for i in range(n_perturb):
         add_to_seed = 0#max_epochs_double_oracle + i + 0*n_perturb
         
@@ -666,15 +673,15 @@ if __name__ == '__main__':
         
         perturbations = np.random.rand(*shape)
         print('Planning Agent BR against Optimist Nature')
-        baseline_optimistic_rl = use_optimistic(do, add_to_seed, i)
+        baseline_optimistic_wi, optimistic_nature_policy = use_optimistic(do, add_to_seed, i)
         print('Learning Nature BR')
-        nature_br = do.nature_oracle.best_response([baseline_optimistic_rl], [1.0], add_to_seed)
+        nature_br = do.nature_oracle.best_response([baseline_optimistic_wi], [1.0], [optimistic_nature_policy], [1.0])
         add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
-        do.update_payoffs(nature_br, baseline_optimistic_rl, add_to_seed)
+        do.update_payoffs(nature_br, baseline_optimistic_wi, add_to_seed)
         n_baseline_comparisons+=1
     
     # Plan against random nature
-    # baseline_rl_against_random_i = len(do.agent_strategies)
+    # baseline_wi_against_random_i = len(do.agent_strategies)
     # for i in range(n_perturb):
     #     add_to_seed = max_epochs_double_oracle + i + 1*n_perturb
     #     rl_against_random_policy = use_random(do, add_to_seed, i)
@@ -686,61 +693,12 @@ if __name__ == '__main__':
     # for i in range(n_perturb):
     i=0
     add_to_seed = 0#max_epochs_double_oracle + i + 2*n_perturb
-    baseline_random_agent = RandomAgentPolicy(do.env, i)
+    baseline_random_agent, random_nature_policy = use_random(do, add_to_seed, i)
     print('Learning nature BR to Random Agent')
-    nature_br = do.nature_oracle.best_response([baseline_random_agent], [1.0], add_to_seed)
+    nature_br = do.nature_oracle.best_response([baseline_random_agent], [1.0], [random_nature_policy], [1.0])
     add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
     do.update_payoffs(nature_br, baseline_random_agent, add_to_seed)
     n_baseline_comparisons+=1
-
-    # compute hawkins regrets
-    # can't compare against hawkins if state size gets too large because of query time
-    if ((not args.data == 'sis') or args.pop_size < 100) and (not args.no_hawkins):
-        hawkins_ind = 0
-        baseline_hawkins_pess_agent_i = len(do.agent_strategies)
-        add_to_seed = 0#max_epochs_double_oracle + 0 + 3*n_perturb
-        if args.data == 'counterexample' or args.data=='armman':
-            pess_nature_params = do.sampled_nature_parameter_ranges.min(axis=-1)
-        elif args.data == 'sis':
-            pess_nat = PessimisticNaturePolicy(do.sampled_nature_parameter_ranges, -1)
-            pess_nature_params = pess_nat.param_setting
-        T = do.env.get_T_for_a_nature(pess_nature_params)
-        baseline_hawkins_pess_agent = HawkinsAgentPolicy(N, T, do.env.R, do.env.C, budget, gamma, hawkins_ind)
-        nature_br = do.nature_oracle.best_response([baseline_hawkins_pess_agent], [1.0], add_to_seed)
-        add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
-        do.update_payoffs(nature_br, baseline_hawkins_pess_agent, add_to_seed)
-        n_baseline_comparisons+=1
-
-
-        hawkins_ind = 1
-        baseline_hawkins_middle_agent_i = len(do.agent_strategies)
-        add_to_seed = 0#max_epochs_double_oracle + 1 + 3*n_perturb
-        if args.data == 'counterexample' or args.data=='armman':
-            middle_nature_params = do.sampled_nature_parameter_ranges.mean(axis=-1)
-        elif args.data == 'sis':
-            mid_nat = MiddleNaturePolicy(do.sampled_nature_parameter_ranges, -1)
-            middle_nature_params = mid_nat.param_setting
-        T = do.env.get_T_for_a_nature(middle_nature_params)
-        baseline_hawkins_middle_agent = HawkinsAgentPolicy(N, T, do.env.R, do.env.C, budget, gamma, hawkins_ind)
-        nature_br = do.nature_oracle.best_response([baseline_hawkins_middle_agent], [1.0], add_to_seed)
-        add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
-        do.update_payoffs(nature_br, baseline_hawkins_middle_agent, add_to_seed)
-        n_baseline_comparisons+=1
-
-        hawkins_ind = 2
-        baseline_hawkins_optimist_agent_i = len(do.agent_strategies)
-        add_to_seed = 0#max_epochs_double_oracle + 2 + 3*n_perturb
-        if args.data == 'counterexample' or args.data=='armman':
-            optimist_nature_params = do.sampled_nature_parameter_ranges.max(axis=-1)
-        elif args.data == 'sis':
-            optimist_nat = OptimisticNaturePolicy(do.sampled_nature_parameter_ranges, -1)
-            optimist_nature_params = optimist_nat.param_setting
-        T = do.env.get_T_for_a_nature(optimist_nature_params)
-        baseline_hawkins_optimist_agent = HawkinsAgentPolicy(N, T, do.env.R, do.env.C, budget, gamma, hawkins_ind)
-        nature_br = do.nature_oracle.best_response([baseline_hawkins_optimist_agent], [1.0], add_to_seed)
-        add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
-        do.update_payoffs(nature_br, baseline_hawkins_optimist_agent, add_to_seed)
-        n_baseline_comparisons+=1
 
 
 
@@ -815,32 +773,32 @@ if __name__ == '__main__':
 
 
 
-    baseline_middle_rl_regrets = np.zeros(n_perturb)
+    baseline_middle_wi_regrets = np.zeros(n_perturb)
     for i in range(n_perturb):
-        baseline_middle_rl_distrib = np.zeros(len(do.agent_strategies))
-        baseline_middle_rl_distrib[baseline_middle_rl_i+i] = 1
-        baseline_middle_rl_regrets[i] = do.compute_payoff_regret(baseline_middle_rl_distrib)
-    baseline_middle_rl_regret = np.min(baseline_middle_rl_regrets)
-    baseline_middle_rl_fairness = np.min(do.fairness[baseline_middle_rl_i:baseline_middle_rl_i+n_perturb, :])
+        baseline_middle_wi_distrib = np.zeros(len(do.agent_strategies))
+        baseline_middle_wi_distrib[baseline_middle_wi_i+i] = 1
+        baseline_middle_wi_regrets[i] = do.compute_payoff_regret(baseline_middle_wi_distrib)
+    baseline_middle_wi_regret = np.min(baseline_middle_wi_regrets)
+    baseline_middle_wi_fairness = np.min(do.fairness[baseline_middle_wi_i:baseline_middle_wi_i+n_perturb, :])
 
-    baseline_pessimistic_rl_regrets = np.zeros(n_perturb)
+    baseline_pessimistic_wi_regrets = np.zeros(n_perturb)
     for i in range(n_perturb):
-        baseline_pessimistic_rl_distrib = np.zeros(len(do.agent_strategies))
-        baseline_pessimistic_rl_distrib[baseline_pessimistic_rl_i+i] = 1
-        baseline_pessimistic_rl_regrets[i] = do.compute_payoff_regret(baseline_pessimistic_rl_distrib)
-    baseline_pessimistic_rl_regret = np.min(baseline_pessimistic_rl_regrets)
-    baseline_pessimistic_rl_fairness = np.min(do.fairness[baseline_pessimistic_rl_i:baseline_pessimistic_rl_i+n_perturb, :])
+        baseline_pessimistic_wi_distrib = np.zeros(len(do.agent_strategies))
+        baseline_pessimistic_wi_distrib[baseline_pessimistic_wi_i+i] = 1
+        baseline_pessimistic_wi_regrets[i] = do.compute_payoff_regret(baseline_pessimistic_wi_distrib)
+    baseline_pessimistic_wi_regret = np.min(baseline_pessimistic_wi_regrets)
+    baseline_pessimistic_wi_fairness = np.min(do.fairness[baseline_pessimistic_wi_i:baseline_pessimistic_wi_i+n_perturb, :])
 
-    baseline_optimistic_rl_regrets = np.zeros(n_perturb)
+    baseline_optimistic_wi_regrets = np.zeros(n_perturb)
     for i in range(n_perturb):
-        baseline_optimistic_rl_distrib = np.zeros(len(do.agent_strategies))
-        baseline_optimistic_rl_distrib[baseline_optimistic_rl_i+i] = 1
-        baseline_optimistic_rl_regrets[i] = do.compute_payoff_regret(baseline_optimistic_rl_distrib)
-    baseline_optimistic_rl_regret = np.min(baseline_optimistic_rl_regrets)
-    baseline_optimistic_rl_fairness = np.min(do.fairness[baseline_optimistic_rl_i:baseline_optimistic_rl_i+n_perturb, :])
+        baseline_optimistic_wi_distrib = np.zeros(len(do.agent_strategies))
+        baseline_optimistic_wi_distrib[baseline_optimistic_wi_i+i] = 1
+        baseline_optimistic_wi_regrets[i] = do.compute_payoff_regret(baseline_optimistic_wi_distrib)
+    baseline_optimistic_wi_regret = np.min(baseline_optimistic_wi_regrets)
+    baseline_optimistic_wi_fairness = np.min(do.fairness[baseline_optimistic_wi_i:baseline_optimistic_wi_i+n_perturb, :])
     
-    print('avg regret of baseline middle {:.3f}'.format(baseline_middle_rl_regret))
-    print('regret of all middle baselines', baseline_middle_rl_regrets)
+    print('avg regret of baseline middle {:.3f}'.format(baseline_middle_wi_regret))
+    print('regret of all middle baselines', baseline_middle_wi_regrets)
 
 
     baseline_random_agent_regrets = np.zeros(1)#np.zeros(n_perturb)
@@ -885,9 +843,9 @@ if __name__ == '__main__':
     bar_vals = [
                     do_regret_no_new_nature, 
                     do_regret, 
-                    baseline_middle_rl_regret, 
-                    baseline_pessimistic_rl_regret,
-                    baseline_optimistic_rl_regret,
+                    baseline_middle_wi_regret, 
+                    baseline_pessimistic_wi_regret,
+                    baseline_optimistic_wi_regret,
                     baseline_random_agent_regret,
                     baseline_hawkins_pess_agent_regret,
                     baseline_hawkins_middle_agent_regret,
@@ -896,9 +854,9 @@ if __name__ == '__main__':
     bar_vals_fairness = [
                     do_fairness_no_new_nature, 
                     do_fairness, 
-                    baseline_middle_rl_fairness, 
-                    baseline_pessimistic_rl_fairness,
-                    baseline_optimistic_rl_fairness,
+                    baseline_middle_wi_fairness, 
+                    baseline_pessimistic_wi_fairness,
+                    baseline_optimistic_wi_fairness,
                     baseline_random_agent_fairness,
                     baseline_hawkins_pess_agent_regret,
                     baseline_hawkins_middle_agent_regret,
@@ -952,9 +910,9 @@ if __name__ == '__main__':
     model_dict = {'agent_eq': agent_eq, 'nature_eq': nature_eq,
                   'agent_strategies': do.agent_strategies[:-n_baseline_comparisons], 'nature_strategies': do.nature_strategies,
                   'agent_baselines':
-                                    {'optimist':baseline_optimistic_rl,
-                                     'pessimist':baseline_pessimistic_rl,
-                                     'middle':baseline_middle_rl,
+                                    {'optimist':baseline_optimistic_wi,
+                                     'pessimist':baseline_pessimistic_wi,
+                                     'middle':baseline_middle_wi,
                                      'random':baseline_random_agent
                                     },
                   'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret,

@@ -322,15 +322,9 @@ class NatureOracle:
 
                 # a_agent  = agent_pol.act_test(torch_o)
                 a_agent  = agent_pol.act_test_cluster_to_indiv(env.cluster_mapping, env.current_arms_state, env.B)
-                # a_nature = nature_pol.get_nature_action(torch_o)
-
-                # ac's step function requires both world observation (for actor) and agent_policy's actions (for critic)
-                # but we can only obtain agent_policy's actions after determining nature's action
-                # so we split the ac.step into two parts, first pass some dummy agent_policy action
-                a_agent_list_dummy = np.zeros(self.N)
                 
                 # We obtain nature's action
-                a_nature, _, logp_nature, q_nature = nature_pol.step(torch_o, a_agent_list_dummy)
+                a_nature = nature_pol.get_nature_action(o)
 
                 # Bound nature's actions within allowed range
                 a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
@@ -382,7 +376,8 @@ class NatureOracle:
         target_kl=0.01, logger_kwargs=dict(), save_freq=10,
         lamb_update_freq=10,
         init_lambda_trains=0,
-        final_train_lambdas=0):
+        final_train_lambdas=0,
+        gurobi_time_limit=10):
         
         # Special function to avoid certain slowdowns from PyTorch + MPI combo.
         setup_pytorch_for_mpi()
@@ -482,14 +477,12 @@ class NatureOracle:
             # if NOT and YES then ['max', 'min']
             # if NOT and NOT then ['max', 'max']
             gamma = gamma
-            time_limit = 1 # prevent Gurobi from running forever # TODO: tune this
-
 
             assert mathprog_methods.check_feasible_range(p01p_range, p11p_range, p01a_range, p11a_range)
     
             optimized_indexes_bqp, L_vals, z_vals, bina_vals, T_return = mathprog_methods.bqp_to_optimize_index_both_states(
                                                                      p01p_range, p11p_range, p01a_range, p11a_range,
-                                                                     R, C, senses=senses, gamma=gamma, time_limit=time_limit)
+                                                                     R, C, senses=senses, gamma=gamma, time_limit=gurobi_time_limit)
 
 
             # T_return are entries in the transition matrix: (state, action, next state) -- note that we only care about the right column (since probabilities next state=0 and next state = 1 will sum to 1)

@@ -2,12 +2,11 @@ import numpy as np
 import itertools
 
 
-
-class PessimisticAgentPolicy:
+class NoActionAgentPolicy:
     def __init__(self, N, ind):
         self.N=N
         self.ind = ind
-        self.name="Pessimist_Agent"
+        self.name="NoAction"
 
     def __repr__(self):
         return "%s_%i"%(self.name, self.ind)
@@ -16,6 +15,10 @@ class PessimisticAgentPolicy:
         
         # Return 0 for all arms
         return np.zeros(self.N)
+
+    def act_test_cluster_to_indiv(self, cluster_mapping, arms_state, B):
+        n_indiv = len(cluster_mapping)
+        return np.zeros(n_indiv)
 
 
 class RandomAgentPolicy:

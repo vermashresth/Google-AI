@@ -41,4 +41,5 @@ python3 ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
 --nature_lm_lr 2e-3 \
 --nature_train_pi_iters 20 \
 --nature_train_vf_iters 20 \
---nature_lamb_update_freq 1
+--nature_lamb_update_freq 1 \
+--gurobi_time_limit 5
