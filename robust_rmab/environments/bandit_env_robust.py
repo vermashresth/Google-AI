@@ -967,11 +967,23 @@ import pickle
 file = 'armman_params_very_small.pickle' # n_clusters = 5, n_arms = 15, use N = 10, B<15
 
 with open(file, 'rb') as handle:
-    print('Loading Pickled Params...')
     info_dict = pickle.load(handle)
-print(f'Loaded Params from {file}')
+
 class ARMMANRobustEnv(gym.Env):
-    def __init__(self, N, B, seed):#, REWARD_BOUND):
+    def __init__(self, N, B, seed, data=None):#, REWARD_BOUND):
+        if data is not None: # If data is explicitly specified
+            if isinstance(data, str): # load from file
+                with open(data, 'rb') as handle:
+                    print('Loading Pickled Params...')
+                    info_dict = pickle.load(handle)
+                print(f'Loaded Params from file {file}')
+            elif isinstance(data, dict): # data is already a dict
+                print(f'Loaded Params from specified data dict')
+                info_dict = data
+            else:
+                NotImplementedError
+        else: # data is not specified, load from global info_dict
+            print(f'Loaded Params from global file {file}')
 
         S = 2
         A = 2
