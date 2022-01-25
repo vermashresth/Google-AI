@@ -409,25 +409,26 @@ class NatureOracle:
         self.env.seed(seed)
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
-    def get_agent_counts(self, agent_pol, nature_pol, env, steps_per_epoch, n_iterations=100):
-        """ returns the probability that each cluster is pulled given its state
-        matrix of dim [n_cluster, n_state] 
-        input into the Whittle index QP solver """
-        INTERVENE = 1
-        counter = np.zeros((self.env.n_clusters, self.S))  # n_clusters, n_states
-
         # create a mapping of cluster -> list of individuals in cluster
         arms_in_cluster = {}
         for cluster in range(self.env.n_clusters):
             arms_in_cluster[cluster] = []
-        for arm in range(len(env.cluster_mapping)):
-            cluster = env.cluster_mapping[arm]
+        for arm in range(len(self.env.cluster_mapping)):
+            cluster = self.env.cluster_mapping[arm]
             arms_in_cluster[cluster].append(arm)
+        self.arms_in_cluster = arms_in_cluster
+
+    def get_agent_counts(self, agent_pol, nature_pol, env, steps_per_epoch, n_iterations=100):
+        """ returns the probability that each cluster is pulled given its state
+        matrix of dim [n_cluster, n_state]
+        input into the Whittle index QP solver """
+
+        INTERVENE = 1
+        counter = np.zeros((self.env.n_clusters, self.S))  # n_clusters, n_states
 
         # iterate through environment to track the actions of our agent policy
         for epoch in range(n_iterations):
             o = env.reset()
-            o_cluster_state = o.reshape(self.env.n_clusters, -1)
             for t in range(steps_per_epoch): # horizon
                 o = o.reshape(-1)
                 torch_o = torch.as_tensor(o, dtype=torch.float32)
@@ -451,7 +452,7 @@ class NatureOracle:
                                                       , debug=(epoch==0 and t==0))
                 for cluster in range(self.env.n_clusters):
                     for s in range(self.S):
-                        for indiv in arms_in_cluster[cluster]:
+                        for indiv in self.arms_in_cluster[cluster]:
                             # count number of actions that are intervene
                             if env.current_arms_state[indiv] == s and a_agent[indiv] == INTERVENE:
                                 counter[cluster, s] += 1
@@ -543,9 +544,6 @@ class NatureOracle:
 
         nature_pol = ac
         agent_counter = self.get_agent_counts(agent_pol, nature_pol, env, steps_per_epoch)
-        print('agent counter')
-        print(agent_counter)
-        sys.exit(0)
 
         # Sync params across processes
         sync_params(ac)

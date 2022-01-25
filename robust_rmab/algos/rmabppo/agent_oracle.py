@@ -133,8 +133,11 @@ class AgentOracle:
         # Main learning component: compute nature's Transition Param (TP) actions
         # and learn determinstic whittle indices against those TP
 
-        if False:
-            # set against nature expected transition probability
+        agent_approach = 'combine_strategies'
+        #agent_approach = 'expected_tp'
+
+        if agent_approach == 'expected_tp':
+            # learn policy against nature expected transition probability
             nature_a = np.zeros(nature_strats[0].get_nature_action(torch_o).shape)
             for i, strat in enumerate(nature_strats):
                 strat_a = strat.get_nature_action(torch_o)
@@ -161,7 +164,8 @@ class AgentOracle:
             wh_policy.learn(a_nature_env)
 
 
-        else:
+        elif agent_approach == 'combine_strategies':
+            # plan against each of nature's approaches separately and then combine
             combined_wh_indices = np.zeros((env.n_clusters, env.S))
             # learn a Whittle policy against each of nature's strategies 
             for i, strat in enumerate(nature_strats):

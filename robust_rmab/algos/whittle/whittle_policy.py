@@ -175,7 +175,8 @@ class WhittlePolicy():
         self.horizon = timesteps
         self.gamma = gamma
         self.id = np.random.uniform(0,1)
-        self.whittle_indices = np.zeros(self.N)
+        n_clusters = self.N // self.S
+        self.whittle_indices = np.zeros((n_clusters, S))
     
     def note_env(self, env):
         self.T = env.T
