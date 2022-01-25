@@ -9,18 +9,21 @@ import numpy as np
 import torch
 from torch.optim import Adam, SGD
 import time
-import robust_rmab.algos.ma_rmabppo.ma_rmabppo_core as core
-from robust_rmab.algos.whittle.mathprog_methods import bqp_to_optimize_index
-from robust_rmab.utils.logx import EpochLogger
-from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
-from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
-from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv
-from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
+import pdb
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import os, sys
 # mpl.use('tkagg')
+
+import robust_rmab.algos.ma_rmabppo.ma_rmabppo_core as core
+from robust_rmab.algos.whittle import mathprog_methods
+from robust_rmab.utils.logx import EpochLogger
+from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
+from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
+#from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv
+from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
+
 from robust_rmab.algos.whittle.whittle_policy import WhittlePolicy
 from robust_rmab.baselines.nature_baselines_armman import CustomPolicy
 
@@ -186,6 +189,8 @@ class MA_RMABPPO_Whittle_Buffer:
         
         return {k: torch.as_tensor(v, dtype=torch.float32) for k,v in data.items()}
 
+
+
 class NatureOracle:
 
     def __init__(self, data, N, S, A, B, seed, REWARD_BOUND, nature_kwargs=dict(),
@@ -253,6 +258,8 @@ class NatureOracle:
         matrix of dim [n_cluster, n_state]
         input into the Whittle index QP solver """
 
+        # TODO: remove this function and instead call the _mixed_strategy function
+
         INTERVENE = 1
         counter = np.zeros((self.env.n_clusters, self.S))  # n_clusters, n_states
 
@@ -290,12 +297,64 @@ class NatureOracle:
        
         # convert to probabilities 
         counter /= (steps_per_epoch * n_iterations)
-        print('counter:', counter)
+        # normalize by number of individuals
+        for cluster in range(self.env.n_clusters):
+            counter[cluster, :] /= len(self.arms_in_cluster[cluster])
+
+        return counter
+
+    def get_agent_counts_mixed_strategy(self, nature_strats, nature_eq, agent_strats, agent_eq, env, steps_per_epoch, n_iterations=100):
+        """ given MSNE for agent and nature, estimate the expected pulls for each (cluster, state) """
+
+        INTERVENE = 1
+        counter = np.zeros((self.env.n_clusters, self.S))  # n_clusters, n_states
+
+        # iterate through environment to track the actions of our agent policy
+        for epoch in range(n_iterations):
+            # sample from nature mixed strategy
+            nature_pol = np.random.choice(nature_strats, p=nature_eq)
+            agent_pol  = np.random.choice(agent_strats, p=agent_eq)
+
+            o = env.reset()
+            for t in range(steps_per_epoch): # horizon
+                o = o.reshape(-1)
+                torch_o = torch.as_tensor(o, dtype=torch.float32)
+
+                # a_agent  = agent_pol.act_test(torch_o)
+                a_agent  = agent_pol.act_test_cluster_to_indiv(env.cluster_mapping, env.current_arms_state, env.B)
+                # a_nature = nature_pol.get_nature_action(torch_o)
+
+                # ac's step function requires both world observation (for actor) and agent_policy's actions (for critic)
+                # but we can only obtain agent_policy's actions after determining nature's action
+                # so we split the ac.step into two parts, first pass some dummy agent_policy action
+                a_agent_list_dummy = np.zeros(self.N)
+                
+                # We obtain nature's action
+                a_nature, _, logp_nature, q_nature = nature_pol.step(torch_o, a_agent_list_dummy)
+
+                # Bound nature's actions within allowed range
+                a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
+
+                next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol
+                                                      , debug=(epoch==0 and t==0))
+                for cluster in range(self.env.n_clusters):
+                    for s in range(self.S):
+                        # count number of actions that are intervene
+                        for indiv in self.arms_in_cluster[cluster]:
+                            if env.current_arms_state[indiv] == s and a_agent[indiv] == INTERVENE:
+                                counter[cluster, s] += 1
+                o = next_o
+       
+        # convert to probabilities 
+        counter /= (steps_per_epoch * n_iterations)
+        # normalize by number of individuals
+        for cluster in range(self.env.n_clusters):
+            counter[cluster, :] /= len(self.arms_in_cluster[cluster])
+
         return counter
 
 
-
-    def best_response(self, nature_strats, nature_eq, add_to_seed):
+    def best_response(self, agent_strats, agent_eq, prev_nature_strats, prev_nature_eq):
         self.strat_ind += 1
         
         # temporarily just return a dummy strategy for Nature Oracle (before we implement the QP-based approach)
@@ -311,10 +370,9 @@ class NatureOracle:
         logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed, data_dir=data_dir)
         # logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed+add_to_seed, data_dir=data_dir)
 
-        return self.best_response_per_cpu(nature_strats, nature_eq, add_to_seed, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
+        return self.best_response_per_cpu(agent_strats, agent_eq, prev_nature_strats, prev_nature_eq, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
 
-    # add_to_seed is obsolete
-    def best_response_per_cpu(self, agent_strats, agent_eq, add_to_seed, ma_actor_critic=core.RMABWhittleNatureOracle, ac_kwargs=dict(), 
+    def best_response_per_cpu(self, agent_strats, agent_eq, prev_nature_strats, prev_nature_eq, ma_actor_critic=core.RMABWhittleNatureOracle, ac_kwargs=dict(), 
         seed=0, 
         steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr_agent=3e-4, pi_lr_nature=3e-4,
         vf_lr_agent=1e-3, vf_lr_nature=1e-3, qf_lr=1e-3, lm_lr=5e-2, 
@@ -337,42 +395,111 @@ class NatureOracle:
         # Instantiate environment
         env = self.env
         
+        o = env.reset()
+        o = o.reshape(-1)
+
         obs_dim = env.observation_dimension
         action_dim_nature = env.action_dim_nature
 
 
-        # Create actor-critic module
-        # This becomes the basis of nature's policy
-        ac = ma_actor_critic(env.observation_space, env.action_space, env.sampled_parameter_ranges,
-             env.action_dim_nature, env=env,
-             N = env.N, C = env.C, B = env.B, strat_ind = self.strat_ind,
-             one_hot_encode = self.one_hot_encode, non_ohe_obs_dim = self.non_ohe_obs_dim,
-            state_norm=self.state_norm, nature_state_norm=self.nature_state_norm,
-            **ac_kwargs)
-        # create Whittle index policy. This helps in computing optimal policy against nature's actions
-        wh_policy = WhittlePolicy(env.N, env.S, env.B,
-                                10, 0.9
-                                 )
-        # Define the observation and action dimensions
-        act_dim_agent = ac.act_dim_agent
-        act_dim_nature = ac.act_dim_nature
-        obs_dim = ac.obs_dim
-        
-        o = env.reset()
-        o = o.reshape(-1)
+        # # Create actor-critic module
+        # # This becomes the basis of nature's policy
+        # ac = ma_actor_critic(env.observation_space, env.action_space, env.sampled_parameter_ranges,
+        #      env.action_dim_nature, env=env,
+        #      N = env.N, C = env.C, B = env.B, strat_ind = self.strat_ind,
+        #      one_hot_encode = self.one_hot_encode, non_ohe_obs_dim = self.non_ohe_obs_dim,
+        #     state_norm=self.state_norm, nature_state_norm=self.nature_state_norm,
+        #     **ac_kwargs)
+        # # create Whittle index policy. This helps in computing optimal policy against nature's actions
+        # wh_policy = WhittlePolicy(env.N, env.S, env.B,
+        #                         10, 0.9
+        #                          )
+        # # Define the observation and action dimensions
+        # act_dim_agent = ac.act_dim_agent
+        # act_dim_nature = ac.act_dim_nature
+        # obs_dim = ac.obs_dim
+        # 
+        # # Get count of agent actions
+        # with torch.no_grad():
+        #     a_nature_mu = ac.pi_nature.mu_net(torch.as_tensor(o, dtype=torch.float32))
+        #     a_nature_env_mu = ac.bound_nature_actions(a_nature_mu, state=o, reshape=True)
 
-        # Get count of agent actions
-        agent_pol = wh_policy
+        # agent_pol = wh_policy
+        # agent_pol.note_env(env)
+        # agent_pol.learn(a_nature_env_mu)
 
-        with torch.no_grad():
-            a_nature_mu = ac.pi_nature.mu_net(torch.as_tensor(o, dtype=torch.float32))
-            a_nature_env_mu = ac.bound_nature_actions(a_nature_mu, state=o, reshape=True)
+        # nature_pol = ac
+        # agent_counts = self.get_agent_counts(agent_pol, nature_pol, env, steps_per_epoch)
 
-        wh_policy.note_env(env)
-        wh_policy.learn(a_nature_env_mu)
+        agent_counts = self.get_agent_counts_mixed_strategy(prev_nature_strats, prev_nature_eq, agent_strats, agent_eq, env, steps_per_epoch, n_iterations=100)	
 
-        nature_pol = ac
-        agent_counter = self.get_agent_counts(agent_pol, nature_pol, env, steps_per_epoch)
+        # TODO: figure out the top B (cluster, state) pairs in terms of avg pull per cluster size
+        #top_B = np.argmax(agent_counts, env.B)
+        # top_B = np.argsort
+
+        # min the largest B, max the smallest B
+        all_senses = np.zeros((env.n_clusters, env.S), dtype=object)
+        play_count_dict = {}
+        for cluster in range(env.n_clusters):
+            for s in range(env.S):
+                play_count_dict[(cluster,s)] = agent_counts[cluster,s]
+    
+        sorted_play_count_dict = sorted(play_count_dict.items(), key=lambda x: x[1], reverse=True)
+    
+        budget = env.B / (env.n_arms // env.n_clusters)
+        for i, (tup, play_count) in enumerate(sorted_play_count_dict):
+            cluster, s = tup[0], tup[1]
+            if i < budget:
+                sense = 'min'
+            else:
+                sense = 'max'
+    
+            all_senses[cluster, s] = sense
+
+
+
+        all_T = np.zeros((env.n_clusters, env.S, env.A))
+
+        # optimize the WI for each cluster independently
+        for cluster in range(env.n_clusters):
+            
+            param_ranges = env.sample_parameter_ranges()
+            
+            p01p_range = param_ranges[cluster,0,0,:] # [cluster, s, action, range]
+            p11p_range = param_ranges[cluster,1,0,:]
+            p01a_range = param_ranges[cluster,0,1,:]
+            p11a_range = param_ranges[cluster,1,1,:]
+
+            R = env.R[cluster]
+            C = env.C
+            # sense1 = 'min' if (cluster,0) in top_B else 'max'
+            # sense2 = 'min' if (cluster,1) in top_B else 'max'
+            # senses = [sense1, sense2]
+            senses = all_senses[cluster, :]
+
+            # if (cluster, state=0) and (cluster, state=1) in top B of pairs, then senses == ['min', 'min']
+            # if (cluster, 0) and  NOT (cluster, 1) then ['min', 'max']
+            # if NOT and YES then ['max', 'min']
+            # if NOT and NOT then ['max', 'max']
+            gamma = gamma
+            time_limit = 1 # prevent Gurobi from running forever # TODO: tune this
+
+
+            assert mathprog_methods.check_feasible_range(p01p_range, p11p_range, p01a_range, p11a_range)
+    
+            optimized_indexes_bqp, L_vals, z_vals, bina_vals, T_return = mathprog_methods.bqp_to_optimize_index_both_states(
+                                                                     p01p_range, p11p_range, p01a_range, p11a_range,
+                                                                     R, C, senses=senses, gamma=gamma, time_limit=time_limit)
+
+
+            # T_return are entries in the transition matrix: (state, action, next state) -- note that we only care about the right column (since probabilities next state=0 and next state = 1 will sum to 1)
+            all_T[cluster, :, :] = T_return[:, :, 1]
+
+        print('nature policy', all_T)
+        nature_policy = CustomPolicy(all_T, -1)
+        return nature_policy
+
+
 
         # Sync params across processes
         sync_params(ac)

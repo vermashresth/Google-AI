@@ -4,6 +4,7 @@ import itertools
 
 class CustomPolicy:
     def __init__(self, actions, ind):
+        """ actions of shape [n_cluster x n_state x n_action] """
         self.actions = actions
         self.ind = ind
         self.name = 'Custom_Policy'

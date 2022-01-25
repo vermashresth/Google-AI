@@ -165,7 +165,7 @@ class DoubleOracle:
             # in first epoch, defender response is ideal defender for initial attractiveness
             agent_br = self.agent_oracle.best_response(self.nature_strategies, nature_eq, add_to_seed)
             # self.update_payoffs_agent(agent_br)
-            nature_br = self.nature_oracle.best_response(self.agent_strategies, agent_eq, add_to_seed)
+            nature_br = self.nature_oracle.best_response(self.agent_strategies, agent_eq, self.nature_strategies, nature_eq)
             # self.update_payoffs_nature(nature_br)
             print('#'*20)
             print('Agent BR: ', agent_br)

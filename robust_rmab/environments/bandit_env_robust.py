@@ -362,6 +362,8 @@ class ARMMANRobustEnv(gym.Env):
                 NotImplementedError
         else: # data is not specified, load from global info_dict
             print(f'Loaded Params from global file {file}')
+            with open(file, 'rb') as handle:
+                info_dict = pickle.load(handle)
 
         S = 2
         A = 2
@@ -529,14 +531,17 @@ class ARMMANRobustEnv(gym.Env):
                     param = a_nature[cluster_idx, state, action]
 
                     if param < self.sampled_parameter_ranges[cluster_idx, state, action, 0]:
-                        print("Warning! nature action below allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_s, arm_a]))
-                        print("Setting to lower bound of range...")
+                        if param + 1e-5 < self.sampled_parameter_ranges[cluster_idx, state, action, 0]:
+                            raise Exception(f"Warning! nature action below allowed param range. Was {param} but should be in {self.sampled_parameter_ranges[cluster_idx, state, action]}")
+                            print("Setting to lower bound of range...")
                         param = self.sampled_parameter_ranges[cluster_idx, state, action, 0]
 
                     elif param > self.sampled_parameter_ranges[cluster_idx, state, action, 1]:
-                        print("Warning! nature action above allowed param range. Was %s but should be in %s"%(param, self.sampled_parameter_ranges[arm_i, arm_s, arm_a]))
-                        print("Setting to upper bound of range...")
+                        if param - 1e-5 > self.sampled_parameter_ranges[cluster_idx, state, action, 1]:
+                            raise Exception(f"Warning! nature action above allowed param range. Was {param} but should be in {self.sampled_parameter_ranges[cluster_idx, state, action]}")
+                            print("Setting to upper bound of range...")
                         param = self.sampled_parameter_ranges[cluster_idx, state, action, 1]
+
                     # Set env's current transitions to nature bounded actions
                     self.T[cluster_idx,state, action,0] = param
                     self.T[cluster_idx,state, action,1] = 1-param
