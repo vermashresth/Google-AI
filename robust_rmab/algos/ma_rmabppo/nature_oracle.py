@@ -433,7 +433,7 @@ class NatureOracle:
                 o = o.reshape(-1)
                 torch_o = torch.as_tensor(o, dtype=torch.float32)
 
-                #a_agent  = agent_pol.act_test(torch_o)
+                # a_agent  = agent_pol.act_test(torch_o)
                 a_agent  = agent_pol.act_test_cluster_to_indiv(env.cluster_mapping, env.current_arms_state, env.B)
                 # a_nature = nature_pol.get_nature_action(torch_o)
 
@@ -452,11 +452,11 @@ class NatureOracle:
                                                       , debug=(epoch==0 and t==0))
                 for cluster in range(self.env.n_clusters):
                     for s in range(self.S):
+                        # count number of actions that are intervene
                         for indiv in self.arms_in_cluster[cluster]:
-                            # count number of actions that are intervene
                             if env.current_arms_state[indiv] == s and a_agent[indiv] == INTERVENE:
                                 counter[cluster, s] += 1
-                o_orig = next_o
+                o = next_o
        
         # convert to probabilities 
         counter /= (steps_per_epoch * n_iterations)
@@ -465,7 +465,6 @@ class NatureOracle:
 
 
 
-    # Todo - figure out parallelization with MPI -- not clear how to do this yet, so restrict to single cpu
     def best_response(self, nature_strats, nature_eq, add_to_seed):
         self.strat_ind += 1
         
