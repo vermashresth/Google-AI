@@ -10,6 +10,7 @@ import torch
 from torch.optim import Adam, SGD
 import time
 import robust_rmab.algos.ma_rmabppo.ma_rmabppo_core as core
+from robust_rmab.algos.whittle.mathprog_methods import bqp_to_optimize_index
 from robust_rmab.utils.logx import EpochLogger
 from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
 from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
@@ -408,20 +409,31 @@ class NatureOracle:
         self.env.seed(seed)
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
-    def get_agent_counts(self, agent_pol, ac, env, steps_per_epoch, n_iterations=100):
-        """ TODO """
-	# ac = nature actor/critic
+    def get_agent_counts(self, agent_pol, nature_pol, env, steps_per_epoch, n_iterations=100):
+        """ returns the probability that each cluster is pulled given its state
+        matrix of dim [n_cluster, n_state] 
+        input into the Whittle index QP solver """
         INTERVENE = 1
-        counter = np.zeros((self.N, self.S))  # n_clusters, n_states
-        o = env.reset()
+        counter = np.zeros((self.env.n_clusters, self.S))  # n_clusters, n_states
 
+        # create a mapping of cluster -> list of individuals in cluster
+        arms_in_cluster = {}
+        for cluster in range(self.env.n_clusters):
+            arms_in_cluster[cluster] = []
+        for arm in range(len(env.cluster_mapping)):
+            cluster = env.cluster_mapping[arm]
+            arms_in_cluster[cluster].append(arm)
+
+        # iterate through environment to track the actions of our agent policy
         for epoch in range(n_iterations):
+            o = env.reset()
+            o_cluster_state = o.reshape(self.env.n_clusters, -1)
             for t in range(steps_per_epoch): # horizon
-                # TODO: why is this necessary? elsewhere this comes out as just [10] instead of [1, 10]
                 o = o.reshape(-1)
                 torch_o = torch.as_tensor(o, dtype=torch.float32)
 
-                a_agent  = agent_pol.act_test(torch_o)
+                #a_agent  = agent_pol.act_test(torch_o)
+                a_agent  = agent_pol.act_test_cluster_to_indiv(env.cluster_mapping, env.current_arms_state, env.B)
                 # a_nature = nature_pol.get_nature_action(torch_o)
 
                 # ac's step function requires both world observation (for actor) and agent_policy's actions (for critic)
@@ -430,20 +442,20 @@ class NatureOracle:
                 a_agent_list_dummy = np.zeros(self.N)
                 
                 # We obtain nature's action
-                a_nature, _, logp_nature, q_nature = ac.step(torch_o, a_agent_list_dummy)
+                a_nature, _, logp_nature, q_nature = nature_pol.step(torch_o, a_agent_list_dummy)
 
                 # Bound nature's actions within allowed range
-                a_nature_env = ac.bound_nature_actions(a_nature, state=o, reshape=True)
+                a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
 
                 next_o, r, d, a_agent_arms = env.step(a_agent, a_nature_env, agent_pol
                                                       , debug=(epoch==0 and t==0))
-                for cluster in range(self.N):
-                    # count number of arms in each state s \in S
+                for cluster in range(self.env.n_clusters):
                     for s in range(self.S):
-                        counter[cluster, s] += np.sum(a_agent)  # number of action that are intervene (assuming intervene = action 1)
-                    #    if a_agent == INTERVENE:
-                    #        counter[cluster, s] += 1
-                o = next_o
+                        for indiv in arms_in_cluster[cluster]:
+                            # count number of actions that are intervene
+                            if env.current_arms_state[indiv] == s and a_agent[indiv] == INTERVENE:
+                                counter[cluster, s] += 1
+                o_orig = next_o
        
         # convert to probabilities 
         counter /= (steps_per_epoch * n_iterations)
@@ -457,7 +469,7 @@ class NatureOracle:
         self.strat_ind += 1
         
         # temporarily just return a dummy strategy for Nature Oracle (before we implement the QP-based approach)
-        return CustomPolicy(self.sampled_nature_parameter_ranges[:,:,:,1], self.strat_ind)
+        #return CustomPolicy(self.sampled_nature_parameter_ranges[:,:,:,1], self.strat_ind)
 
 
         # mpi_fork(args.cpu, is_cannon=args.cannon)  # run parallel code with mpi
@@ -531,7 +543,9 @@ class NatureOracle:
 
         nature_pol = ac
         agent_counter = self.get_agent_counts(agent_pol, nature_pol, env, steps_per_epoch)
-        #sys.exit(0)
+        print('agent counter')
+        print(agent_counter)
+        sys.exit(0)
 
         # Sync params across processes
         sync_params(ac)
