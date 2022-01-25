@@ -13,6 +13,7 @@ import argparse
 import numpy as np
 import pandas as pd
 import torch
+import pickle
 
 import matplotlib.pyplot as plt
 
@@ -166,28 +167,31 @@ class DoubleOracle:
             # self.update_payoffs_agent(agent_br)
             nature_br = self.nature_oracle.best_response(self.agent_strategies, agent_eq, add_to_seed)
             # self.update_payoffs_nature(nature_br)
-            print('#'*10)
+            print('#'*20)
             print('Agent BR: ', agent_br)
             print('Nature BR: ', nature_br)
-            print('#'*10)
+            print('#'*20)
+            print()
+            dummy_o = np.zeros(self.N, dtype=int)
+            dummy_o = torch.as_tensor(dummy_o, dtype=torch.float32)
+            print('Nature action: ', nature_br.get_nature_action(dummy_o))
 
             add_to_seed = 0 # keep this zero so everyone gets the same seeds for the n_simu_epochs
             self.update_payoffs(nature_br, agent_br, add_to_seed)
-            print('*'*100)
-            print(self.fairness)
-            # print(self.payoffs)
+
 
             # find equilibrium of subgame
+            print('\nFinding Equilibrium \n')
             agent_eq, nature_eq = self.find_equilibrium()
-            print('#'*100, '\n\n', 'Equilibriums')
-            print(agent_eq, nature_eq)
-            print('#'*100, '\n\n', 'Equilibriums')
-
+            print()
+            print('#'*20)
             print('agent equilibrium    ', np.round(agent_eq, 3))
             print('nature equilibrium ', np.round(nature_eq, 3))
+            print('#'*20)
+            print()
 
             max_regret_game = np.array(self.payoffs) - np.array(self.payoffs).max(axis=0)
-            print('!!!!! ', n_epochs, 'payoffs are', get_payoff(max_regret_game, agent_eq, nature_eq))
+            # print('!!!!! ', n_epochs, 'payoffs are', get_payoff(max_regret_game, agent_eq, nature_eq))
 
             if n_epochs >= self.max_epochs_double_oracle: 
                 converged = True
@@ -603,11 +607,12 @@ if __name__ == '__main__':
     #     print('   ', np.round(a, 3))
 
     print()
-    print('payoffs (regret)', np.array(do.payoffs).shape)
-    print('!'*100, '\n Fairness: ', np.array(do.fairness))
+    print('payoffs (regret)')
     regret = np.array(do.payoffs) - np.array(do.payoffs).max(axis=0)
     for p in regret:
         print('   ', np.round(p, 2))
+    print('Fairness Matrix')
+    print(np.array(do.fairness))
 
 
     ###########
@@ -918,10 +923,6 @@ if __name__ == '__main__':
     print('regrets', tick_names)
     print(np.round(bar_vals, 3))
 
-    print('$'*100)
-    print(do.fairness)
-    print(do_fairness, do_fairness_no_new_nature, baseline_middle_rl_fairness, baseline_random_agent_fairness)
-    print('$'*100)
     if args.cannon:
         import matplotlib
         matplotlib.use('pdf')
@@ -947,3 +948,23 @@ if __name__ == '__main__':
 
     if not args.cannon:
         plt.show()
+    print('saving model')
+    model_dict = {'agent_eq': agent_eq, 'nature_eq': nature_eq,
+                  'agent_strategies': do.agent_strategies[:-n_baseline_comparisons], 'nature_strategies': do.nature_strategies,
+                  'agent_baselines':
+                                    {'optimist':baseline_optimistic_rl,
+                                     'pessimist':baseline_pessimistic_rl,
+                                     'middle':baseline_middle_rl,
+                                     'random':baseline_random_agent
+                                    },
+                  'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret,
+                  'N': do.N, 'b':budget}
+    save_path = f'{args.home_dir}/logs/model_dump'
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    save_file = f'{save_path}/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}.pickle'
+
+    with open(save_file, 'wb') as f:
+        print('Saving model at ', save_file)
+        pickle.dump(model_dict, f)
+                  

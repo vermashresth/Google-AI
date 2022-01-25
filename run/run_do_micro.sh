@@ -8,8 +8,9 @@ python3 ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
 --save_string ${5} \
 -N ${6} -B ${7} \
 --no_hawkins ${8} \
+-S ${9} \
 --horizon 10 \
---max_epochs_double_oracle 5 \
+--max_epochs_double_oracle 1 \
 --n_simu_epochs 10 \
 --n_perturb 1 \
 --agent_steps 10 \
@@ -27,7 +28,7 @@ python3 ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
 --agent_lamb_update_freq 2 \
 \
 --nature_steps 10 \
---nature_epochs 20 \
+--nature_epochs 1 \
 --nature_init_lambda_trains 0 \
 --nature_clip_ratio 2 \
 --nature_final_train_lambdas 20 \

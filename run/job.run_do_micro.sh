@@ -5,8 +5,9 @@ B=5
 seed=0
 cdir="."
 no_hawkins=1
+S=2
 
-bash run_do_micro.sh ${cdir} ${seed} 0 ${data} ${save_string} ${N} ${B} ${no_hawkins}
+bash run_do_micro.sh ${cdir} ${seed} 0 ${data} ${save_string} ${N} ${B} ${no_hawkins} ${S}
 
 
 
