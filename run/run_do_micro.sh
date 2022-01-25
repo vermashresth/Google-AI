@@ -10,7 +10,7 @@ python3 ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
 --no_hawkins ${8} \
 -S ${9} \
 --horizon 10 \
---max_epochs_double_oracle 1 \
+--max_epochs_double_oracle 10 \
 --n_simu_epochs 10 \
 --n_perturb 1 \
 --agent_steps 10 \

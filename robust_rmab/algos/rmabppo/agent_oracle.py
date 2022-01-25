@@ -74,8 +74,7 @@ class AgentOracle:
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
 
-    # Todo - figure out parallelization with MPI -- not clear how to do this yet, so restrict to single cpu
-    def best_response(self, nature_strats, nature_eq, add_to_seed):
+    def best_response(self, nature_strats, nature_eq, add_to_seed, agent_approach='combine_strategies'): # agent_approach: expected_tp
 
         self.strat_ind += 1
 
@@ -88,10 +87,12 @@ class AgentOracle:
         logger_kwargs = setup_logger_kwargs(exp_name, self.seed, data_dir=data_dir)
         # logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed+add_to_seed, data_dir=data_dir)
 
-        return self.best_response_per_cpu(nature_strats, nature_eq, add_to_seed, seed=self.seed,  logger_kwargs=logger_kwargs, **self.agent_kwargs)
+        return self.best_response_per_cpu(nature_strats, nature_eq, add_to_seed, agent_approach=agent_approach, seed=self.seed, logger_kwargs=logger_kwargs, **self.agent_kwargs)
+
 
     # add_to_seed is obsolete
-    def best_response_per_cpu(self, nature_strats, nature_eq, add_to_seed, actor_critic=None, ac_kwargs=dict(), seed=0, 
+    def best_response_per_cpu(self, nature_strats, nature_eq, add_to_seed, agent_approach,
+            actor_critic=None, ac_kwargs=dict(), seed=0, 
             steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
             vf_lr=1e-3, qf_lr=1e-3, lm_lr=5e-2, train_pi_iters=80, train_v_iters=80, train_q_iters=80,
             lam_OTHER=0.97,
@@ -113,22 +114,11 @@ class AgentOracle:
         env = self.env
 
         o = env.reset()
-
-        # Create Whittle Policy
-        wh_policy = WhittlePolicy(env.N, env.S, env.B,
-                                self.agent_kwargs['steps_per_epoch'], self.agent_kwargs['gamma']
-                                 )
-
-
         o = o.reshape(-1)
         torch_o = torch.as_tensor(o, dtype=torch.float32)
 
+
         # Sample a nature policy
-        # TODO: Currently we only calculate best response to one sample of nature policy from nature mixed strategy
-        # TODO: Instead we want to calculate best response to expected nature from nature mixed strategy
-
-
-        # TODO: this is only sampling one strategy. 
         nature_eq = np.array(nature_eq)
         nature_eq[nature_eq < 0] = 0
         nature_eq = nature_eq / nature_eq.sum()
@@ -136,40 +126,58 @@ class AgentOracle:
         # # sample one strategy
         # nature_pol = np.random.choice(nature_strats,p=nature_eq)
 
-        #print(nature_eq)
-        #print(nature_strats)
-        #print(nature_strats[0])
-        nature_a = np.zeros(nature_strats[0].get_nature_action(torch_o).shape)
-        for i, strat in enumerate(nature_strats):
-            strat_a = strat.get_nature_action(torch_o)
-            print('strat_a', strat_a, nature_eq[i])
-            nature_a = nature_a + nature_eq[i] * strat_a
-        nature_pol = CustomPolicy(nature_a, 0)
-        #print('agent oracle')
-        #print(nature_pol)
-        # sys.exit(0)
-
-
         # Main learning component: compute nature's Transition Param (TP) actions
         # and learn determinstic whittle indices against those TP
 
-        print('Computing Agent\'s Best Response')
-        print('Nature opponent chosen: ', nature_eq, nature_pol)
+        if agent_approach == 'expected_tp':
+            # learn policy against nature expected transition probability
+            nature_a = np.zeros(nature_strats[0].get_nature_action(torch_o).shape)
+            for i, strat in enumerate(nature_strats):
+                strat_a = strat.get_nature_action(torch_o)
+                nature_a = nature_a + nature_eq[i] * strat_a
+            nature_pol = CustomPolicy(nature_a, 0)
 
-        a_nature = nature_pol.get_nature_action(torch_o)
+            print('Computing Agent\'s Best Response')
+            print('Nature opponent chosen: ', nature_eq, nature_pol)
 
-        # Sample nature policy
-        nature_pol = np.random.choice(nature_strats, p=nature_eq)
+            a_nature = nature_pol.get_nature_action(torch_o)
+
+            a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
+            print('nature transitions:', a_nature_env)
+
+            # Create Whittle Policy
+            wh_policy = WhittlePolicy(env.N, env.S, env.B,
+                                    self.agent_kwargs['steps_per_epoch'], self.agent_kwargs['gamma']
+                                     )
+
+            # Whittle policy action
+            wh_policy.note_env(env)
+            wh_policy.learn(a_nature_env)
+
+
+        elif agent_approach == 'combine_strategies':
+            # plan against each of nature's approaches separately and then combine
+            combined_wh_indices = np.zeros((env.n_clusters, env.S))
+            # learn a Whittle policy against each of nature's strategies
+            for i, strat in enumerate(nature_strats):
+                nature_pol = strat
+
+                a_nature = nature_pol.get_nature_action(torch_o)
+                a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
             
-        torch_o = torch.as_tensor(o, dtype=torch.float32)
-        a_nature = nature_pol.get_nature_action(torch_o)
+                wh_policy = WhittlePolicy(env.N, env.S, env.B,
+                                        self.agent_kwargs['steps_per_epoch'], self.agent_kwargs['gamma'])
 
-        a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
-        print('nature transitions:', a_nature_env)
+                # Whittle policy action
+                wh_policy.note_env(env)
+                wh_policy.learn(a_nature_env)
 
-        # Whittle policy action
-        wh_policy.note_env(env)
-        wh_policy.learn(a_nature_env)
+                strat_eq = nature_eq[i]
+
+                combined_wh_indices += strat_eq * wh_policy.whittle_indices
+
+            combined_wh_policy = WhittlePolicy(env.N, env.S, env.B, self.agent_kwargs['steps_per_epoch'], self.agent_kwargs['gamma'])
+            combined_wh_policy.whittle_indices = combined_wh_indices
 
         return wh_policy
 
