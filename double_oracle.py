@@ -425,7 +425,7 @@ if __name__ == '__main__':
     parser.add_argument('--nature_train_pi_iters', type=int, default=20, help="Training iterations to run per epoch")
     parser.add_argument('--nature_train_vf_iters', type=int, default=20, help="Training iterations to run per epoch")
     parser.add_argument('--nature_lamb_update_freq', type=int, default=4, help="Number of epochs that should pass before updating the lambda network (so really it is a period, not frequency)")
-    parser.add_argument('--gurobi_time_limit', type=int, default=10, help="Gurobi max solve time (in sec)")
+    parser.add_argument('--gurobi_time_limit', type=float, default=10, help="Gurobi max solve time (in sec)")
     parser.add_argument('--no_hawkins', type=int, default=0, help="If set, will not run Hawkins baselines")
 
     parser.add_argument('--home_dir', type=str, default='.', help="Home directory for experiments")

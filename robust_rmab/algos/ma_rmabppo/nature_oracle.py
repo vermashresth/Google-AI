@@ -428,28 +428,30 @@ class NatureOracle:
 
         agent_counts = self.get_agent_counts_mixed_strategy(prev_nature_strats, prev_nature_eq, agent_strats, agent_eq, env, steps_per_epoch, n_iterations=100)	
 
-        # TODO: figure out the top B (cluster, state) pairs in terms of avg pull per cluster size
-        #top_B = np.argmax(agent_counts, env.B)
-        # top_B = np.argsort
+        # identify the top B (cluster, state) pairs in terms of avg pull per cluster size
+        top_B = np.argsort(agent_counts, axis=None)[-np.floor(env.B).astype('int'):][::-1]  # indices of top B values
+        top_B_coords = np.unravel_index(top_B, agent_counts.shape)
+        top_B_coords = [(top_B_coords[0][cluster], top_B_coords[1][cluster]) for cluster in range(env.n_clusters)]
+        
 
-        # min the largest B, max the smallest B
-        all_senses = np.zeros((env.n_clusters, env.S), dtype=object)
-        play_count_dict = {}
-        for cluster in range(env.n_clusters):
-            for s in range(env.S):
-                play_count_dict[(cluster,s)] = agent_counts[cluster,s]
+        # # min the largest B, max the smallest B
+        # all_senses = np.zeros((env.n_clusters, env.S), dtype=object)
+        # play_count_dict = {}
+        # for cluster in range(env.n_clusters):
+        #     for s in range(env.S):
+        #         play_count_dict[(cluster,s)] = agent_counts[cluster,s]
     
-        sorted_play_count_dict = sorted(play_count_dict.items(), key=lambda x: x[1], reverse=True)
+        # sorted_play_count_dict = sorted(play_count_dict.items(), key=lambda x: x[1], reverse=True)
     
-        budget = env.B / (env.n_arms // env.n_clusters)
-        for i, (tup, play_count) in enumerate(sorted_play_count_dict):
-            cluster, s = tup[0], tup[1]
-            if i < budget:
-                sense = 'min'
-            else:
-                sense = 'max'
+        # budget = env.B / (env.n_arms // env.n_clusters)
+        # for i, (tup, play_count) in enumerate(sorted_play_count_dict):
+        #     cluster, s = tup[0], tup[1]
+        #     if i < budget:
+        #         sense = 'min'
+        #     else:
+        #         sense = 'max'
     
-            all_senses[cluster, s] = sense
+        #     all_senses[cluster, s] = sense
 
 
 
@@ -467,16 +469,13 @@ class NatureOracle:
 
             R = env.R[cluster]
             C = env.C
-            # sense1 = 'min' if (cluster,0) in top_B else 'max'
-            # sense2 = 'min' if (cluster,1) in top_B else 'max'
-            # senses = [sense1, sense2]
-            senses = all_senses[cluster, :]
 
-            # if (cluster, state=0) and (cluster, state=1) in top B of pairs, then senses == ['min', 'min']
-            # if (cluster, 0) and  NOT (cluster, 1) then ['min', 'max']
-            # if NOT and YES then ['max', 'min']
-            # if NOT and NOT then ['max', 'max']
-            gamma = gamma
+            # senses indicates whether the QP should try to minimize or maximize a WI
+            # if (cluster, state=0) and (cluster, state=1) in top B of pairs, then senses == ['min', 'min'] and so on
+            sense1 = 'min' if (cluster,0) in top_B_coords else 'max'
+            sense2 = 'min' if (cluster,1) in top_B_coords else 'max'
+            senses = [sense1, sense2]
+            #senses = all_senses[cluster, :]
 
             assert mathprog_methods.check_feasible_range(p01p_range, p11p_range, p01a_range, p11a_range)
     
