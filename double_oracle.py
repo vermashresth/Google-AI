@@ -17,8 +17,8 @@ import pickle
 
 import matplotlib.pyplot as plt
 
-from robust_rmab.algos.rmabppo.agent_oracle import AgentOracle
-from robust_rmab.algos.ma_rmabppo.nature_oracle import NatureOracle
+from robust_rmab.algos.agent.agent_oracle import AgentOracle
+from robust_rmab.algos.nature.nature_oracle import NatureOracle
 
 from robust_rmab.nfg_solver import solve_minimax_regret, get_payoff, solve_minimax_regret_with_regret_array
 
@@ -29,7 +29,7 @@ from robust_rmab.baselines.agent_baselines import   (
                         )
 
 from robust_rmab.baselines.nature_baselines_armman import   (
-                            RandomNaturePolicy, PessimisticNaturePolicy, MiddleNaturePolicy, 
+                            RandomNaturePolicy, PessimisticNaturePolicy, MiddleNaturePolicy,
                             OptimisticNaturePolicy
                         )
 
@@ -88,8 +88,14 @@ class DoubleOracle:
         elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
 
-        elif data == 'armman':
-            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed)
+        elif data == 'armman_large':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='large')
+        
+        elif data == 'armman_small':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='small')
+
+        elif data == 'armman_very_small':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='very_small')
 
         elif data == 'circulant':
             self.env_fn = lambda : CirculantDynamicsEnv(N,budget,seed)
@@ -101,6 +107,8 @@ class DoubleOracle:
             self.env_fn = lambda : SISRobustEnv(N,budget,pop_size,seed)
             self.nature_state_norm = 1
 
+        else:
+            raise Exception(f'data {data} not implemented')
 
         self.env = self.env_fn()
         self.sampled_nature_parameter_ranges = self.env.sample_parameter_ranges()
@@ -108,14 +116,14 @@ class DoubleOracle:
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
 
-        self.agent_oracle  = AgentOracle(data, N, S, A, budget, seed, reward_bound,
+        self.agent_oracle  = AgentOracle(data, self.env_fn, N, S, A, budget, seed, reward_bound,
                              agent_kwargs=agent_kwargs, home_dir=home_dir, exp_name=exp_name,
                              sampled_nature_parameter_ranges = self.sampled_nature_parameter_ranges,
                              pop_size=self.pop_size, one_hot_encode=one_hot_encode, state_norm=state_norm,
                              non_ohe_obs_dim=non_ohe_obs_dim)
  
 
-        self.nature_oracle = NatureOracle(data, N, S, A, budget, seed, reward_bound,
+        self.nature_oracle = NatureOracle(data, self.env_fn, N, S, A, budget, seed, reward_bound,
                              nature_kwargs=nature_kwargs, home_dir=home_dir, exp_name=exp_name,
                              sampled_nature_parameter_ranges = self.sampled_nature_parameter_ranges,
                              pop_size=self.pop_size, one_hot_encode=one_hot_encode, state_norm=state_norm,
@@ -396,35 +404,10 @@ if __name__ == '__main__':
 
     parser.add_argument('--agent_steps', type=int, default=10, help="Number of rollout steps between epochs")
     parser.add_argument('--agent_epochs', type=int, default=10, help="Number of training epochs")
-    parser.add_argument('--agent_init_lambda_trains', type=int, default=0, help="Deprecated, leave at 0")
-    parser.add_argument('--agent_clip_ratio', type=float, default=2.0, help="Clip ratio for PPO step")
-    parser.add_argument('--agent_final_train_lambdas', type=int, default=10, help="Number of epochs at the end of training to update the policy and critic network, but not the lambda-network")
-    parser.add_argument('--agent_start_entropy_coeff', type=float, default=0.0, help="Start entropy coefficient for the cooling procedure")
-    parser.add_argument('--agent_end_entropy_coeff', type=float, default=0.0, help="End entropy coefficient for the cooling procedure")
-    parser.add_argument('--agent_pi_lr', type=float, default=2e-3, help="Learning rate for policy network")
-    parser.add_argument('--agent_vf_lr', type=float, default=2e-3, help="Learning rate for critic network")
-    parser.add_argument('--agent_lm_lr', type=float, default=2e-3, help="Learning rate for lambda network")
-    parser.add_argument('--agent_train_pi_iters', type=int, default=20, help="Training iterations to run per epoch")
-    parser.add_argument('--agent_train_vf_iters', type=int, default=20, help="Training iterations to run per epoch")
-    parser.add_argument('--agent_lamb_update_freq', type=int, default=4, help="Number of epochs that should pass before updating the lambda network (so really it is a period, not frequency)")
-    
-
+    parser.add_argument('--agent_approach', type=str, default='combine_strategies', help="Approach to use for agent oracle", choices=['combine_strategies', 'expected_tp'])
 
     parser.add_argument('--nature_steps', type=int, default=100, help="Number of rollout steps between epochs")
     parser.add_argument('--nature_epochs', type=int, default=100, help="Number of training epochs")
-    parser.add_argument('--nature_init_lambda_trains', type=int, help="Deprecated, leave at 0")
-    parser.add_argument('--nature_clip_ratio', type=float, default=2.0, help="Clip ratio for PPO step")
-    parser.add_argument('--nature_final_train_lambdas', type=int, default=10, help="Number of epochs at the end of training to update the policy and critic networks, but not the lambda-network")
-    parser.add_argument('--nature_start_entropy_coeff', type=float, default=0.0, help="Start entropy coefficient for the cooling procedure")
-    parser.add_argument('--nature_end_entropy_coeff', type=float, default=0.0, help="End entropy coefficient for the cooling procedure")
-    parser.add_argument('--nature_pi_lr_A', type=float, default=1e-3, help="Learning rate for policy network of agent A")
-    parser.add_argument('--nature_vf_lr_A', type=float, default=1e-3, help="Learning rate for critic network of agent A")
-    parser.add_argument('--nature_pi_lr_B', type=float, default=5e-3, help="Learning rate for policy network of agent B")
-    parser.add_argument('--nature_vf_lr_B', type=float, default=5e-3, help="Learning rate for critic network of agent B")
-    parser.add_argument('--nature_lm_lr', type=float, default=2e-3, help="Learning rate for lambda network")
-    parser.add_argument('--nature_train_pi_iters', type=int, default=20, help="Training iterations to run per epoch")
-    parser.add_argument('--nature_train_vf_iters', type=int, default=20, help="Training iterations to run per epoch")
-    parser.add_argument('--nature_lamb_update_freq', type=int, default=4, help="Number of epochs that should pass before updating the lambda network (so really it is a period, not frequency)")
     parser.add_argument('--gurobi_time_limit', type=float, default=10, help="Gurobi max solve time (in sec)")
     parser.add_argument('--no_hawkins', type=int, default=0, help="If set, will not run Hawkins baselines")
 
@@ -434,12 +417,14 @@ if __name__ == '__main__':
     parser.add_argument('--perturbation_size', type=float, default=0.1, help="Size of the perturbation in the above framework")
     parser.add_argument('--pop_size', type=int, default=10, help="If --data==sis, then this sets the population size")
     parser.add_argument('--save_string', type=str, default="exp", help='unique string for saving files related to this experiment')
-    parser.add_argument('-d', '--data', default='armman', type=str, help='Environment selection',
+    parser.add_argument('-d', '--data', default='armman_very_small', type=str, help='Environment selection',
                         choices=[   
                                     'random',
                                     'random_reset',
                                     'circulant', 
-                                    'armman',
+                                    'armman_large',
+                                    'armman_small',
+                                    'armman_very_small',
                                     'counterexample',
                                     'sis'
                                 ])
@@ -452,19 +437,8 @@ if __name__ == '__main__':
     agent_kwargs = {}
     agent_kwargs['steps_per_epoch'] = args.agent_steps
     agent_kwargs['epochs'] = args.agent_epochs
-    agent_kwargs['init_lambda_trains'] = args.agent_init_lambda_trains
-    agent_kwargs['clip_ratio'] = args.agent_clip_ratio
-    agent_kwargs['final_train_lambdas'] = args.agent_final_train_lambdas
-    agent_kwargs['start_entropy_coeff'] = args.agent_start_entropy_coeff
-    agent_kwargs['end_entropy_coeff'] = args.agent_end_entropy_coeff
-    agent_kwargs['pi_lr'] = args.agent_pi_lr
-    agent_kwargs['vf_lr'] = args.agent_vf_lr
-    agent_kwargs['lm_lr'] = args.agent_lm_lr
-    agent_kwargs['train_pi_iters'] = args.agent_train_pi_iters
-    agent_kwargs['train_v_iters'] = args.agent_train_vf_iters
-    agent_kwargs['lamb_update_freq'] = args.agent_lamb_update_freq
-    agent_kwargs['ac_kwargs'] = dict(hidden_sizes=[args.hid]*args.l)
     agent_kwargs['gamma'] = args.gamma
+    agent_kwargs['agent_approach'] = args.agent_approach
     
 
 

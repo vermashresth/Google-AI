@@ -13,8 +13,8 @@ import torch
 from torch.optim import Adam, SGD
 import time
 from robust_rmab.utils.logx import EpochLogger
-from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
-from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
+#from robust_rmab.utils.mpi_pytorch import setup_pytorch_for_mpi, sync_params, mpi_avg_grads
+#from robust_rmab.utils.mpi_tools import mpi_fork, mpi_avg, proc_id, mpi_statistics_scalar, num_procs
 #from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv, ARMMANEnv
 from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
 
@@ -25,7 +25,7 @@ from robust_rmab.baselines.nature_baselines_armman import CustomPolicy
 
 class AgentOracle:
 
-    def __init__(self, data, N, S, A, B, seed, REWARD_BOUND, agent_kwargs=dict(),
+    def __init__(self, data, env_fn, N, S, A, B, seed, REWARD_BOUND, agent_kwargs=dict(),
         home_dir="", exp_name="", sampled_nature_parameter_ranges=None, robust_keyword="",
         pop_size=0, one_hot_encode=True, non_ohe_obs_dim=None, state_norm=None):
 
@@ -46,35 +46,19 @@ class AgentOracle:
         self.non_ohe_obs_dim = non_ohe_obs_dim
         self.state_norm = state_norm
 
-        if data == 'random':
-            self.env_fn = lambda : RandomBanditEnv(N,S,A,B,seed,REWARD_BOUND)
-
-        elif data == 'random_reset':
-            self.env_fn = lambda : RandomBanditResetEnv(N,S,A,B,seed,REWARD_BOUND)
-
-        elif data == 'armman':
-            self.env_fn = lambda : ARMMANRobustEnv(N,B,seed)
-
-        elif data == 'circulant':
-            self.env_fn = lambda : CirculantDynamicsEnv(N,B,seed)
-
-        elif data == 'counterexample':
-            self.env_fn = lambda : CounterExampleRobustEnv(N,B,seed)
-
-        elif data == 'sis':
-            self.env_fn = lambda : SISRobustEnv(N,B,pop_size,seed)
+        self.env_fn = env_fn
+        self.env = self.env_fn()
 
         self.agent_kwargs=agent_kwargs
 
         self.strat_ind = 0
 
         # this won't work if we go back to MPI, but doing it now to simplify seeding
-        self.env = self.env_fn()
         self.env.seed(seed)
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
 
-    def best_response(self, nature_strats, nature_eq, add_to_seed, agent_approach='combine_strategies'): # agent_approach: expected_tp
+    def best_response(self, nature_strats, nature_eq, add_to_seed):
 
         self.strat_ind += 1
 
@@ -87,23 +71,17 @@ class AgentOracle:
         logger_kwargs = setup_logger_kwargs(exp_name, self.seed, data_dir=data_dir)
         # logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed+add_to_seed, data_dir=data_dir)
 
-        return self.best_response_per_cpu(nature_strats, nature_eq, add_to_seed, agent_approach=agent_approach, seed=self.seed, logger_kwargs=logger_kwargs, **self.agent_kwargs)
+        return self.best_response_per_cpu(nature_strats, nature_eq, add_to_seed, seed=self.seed, logger_kwargs=logger_kwargs, **self.agent_kwargs)
 
 
     # add_to_seed is obsolete
-    def best_response_per_cpu(self, nature_strats, nature_eq, add_to_seed, agent_approach,
-            actor_critic=None, ac_kwargs=dict(), seed=0, 
-            steps_per_epoch=4000, epochs=50, gamma=0.99, clip_ratio=0.2, pi_lr=3e-4,
-            vf_lr=1e-3, qf_lr=1e-3, lm_lr=5e-2, train_pi_iters=80, train_v_iters=80, train_q_iters=80,
-            lam_OTHER=0.97,
-            start_entropy_coeff=0.0, end_entropy_coeff=0.0,
-            max_ep_len=1000,
-            target_kl=0.01, logger_kwargs=dict(), save_freq=10,
-            lamb_update_freq=10,
-            init_lambda_trains=0,
-            final_train_lambdas=0):
-        ''' 
-        This function outputs best response whittle index policy against a nature mixed strategy. 
+    def best_response_per_cpu(self, nature_strats, nature_eq, add_to_seed,
+            actor_critic=None, ac_kwargs=dict(), seed=0,
+            steps_per_epoch=4000, epochs=50, gamma=0.99,
+            logger_kwargs=dict(), save_freq=10,
+            agent_approach='combine_strategies'):
+        '''
+        This function outputs best response whittle index policy against a nature mixed strategy.
         Many function arguments are residuals from previous deep RL based Agent Oracle and are no longer used
         '''
         # Set up logger and save configuration

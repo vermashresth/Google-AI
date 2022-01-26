@@ -10,36 +10,14 @@ python3 ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
 --no_hawkins ${8} \
 -S ${9} \
 --horizon 10 \
---max_epochs_double_oracle 1 \
+--max_epochs_double_oracle ${10} \
 --n_simu_epochs 10 \
 --n_perturb 1 \
+\
 --agent_steps 10 \
 --agent_epochs 1 \
---agent_init_lambda_trains 0 \
---agent_clip_ratio 2 \
---agent_final_train_lambdas 20 \
---agent_start_entropy_coeff 0.5 \
---agent_end_entropy_coeff 0 \
---agent_pi_lr 2e-3 \
---agent_vf_lr 2e-3 \
---agent_lm_lr 2e-3 \
---agent_train_pi_iters 20 \
---agent_train_vf_iters 20 \
---agent_lamb_update_freq 2 \
+--agent_approach ${11} \
 \
 --nature_steps 10 \
 --nature_epochs 1 \
---nature_init_lambda_trains 0 \
---nature_clip_ratio 2 \
---nature_final_train_lambdas 20 \
---nature_start_entropy_coeff 0.5 \
---nature_end_entropy_coeff 0 \
---nature_pi_lr_A 1e-3 \
---nature_vf_lr_A 1e-3 \
---nature_pi_lr_B 5e-3 \
---nature_vf_lr_B 5e-3 \
---nature_lm_lr 2e-3 \
---nature_train_pi_iters 20 \
---nature_train_vf_iters 20 \
---nature_lamb_update_freq 1 \
 --gurobi_time_limit 5

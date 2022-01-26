@@ -4,6 +4,7 @@ import gym
 import torch
 from scipy.special import comb
 import time
+import pickle
 
 class ToyRobustEnv(gym.Env):
     def __init__(self, N, B, seed):
@@ -338,32 +339,37 @@ class CounterExampleRobustEnv(gym.Env):
 
         return [seed1]
 
-
-import pickle
-# file = 'armman_params.pickle' # n_clusters = 40, n_arms = 7668. use N = 80, B<7668
-# file = 'armman_params_small.pickle' # n_clusters = 26, n_arms = 100. use N = 52, B<100
-file = 'armman_params_very_small.pickle' # n_clusters = 5, n_arms = 15, use N = 10, B<15
-
-with open(file, 'rb') as handle:
-    info_dict = pickle.load(handle)
-
 class ARMMANRobustEnv(gym.Env):
     def __init__(self, N, B, seed, data=None):#, REWARD_BOUND):
         if data is not None: # If data is explicitly specified
             if isinstance(data, str): # load from file
-                with open(data, 'rb') as handle:
-                    print('Loading Pickled Params...')
+
+                if data == 'large':
+                    in_file = 'armman_params.pickle' # n_clusters = 40, n_arms = 7668. use N = 80, B<7668
+                    assert N == 80
+                elif data == 'small':
+                    in_file = 'armman_params_small.pickle' # n_clusters = 26, n_arms = 100. use N = 52, B<100
+                    assert N == 52
+                elif data == 'very_small':
+                    in_file = 'armman_params_very_small.pickle' # n_clusters = 5, n_arms = 15, use N = 10, B<15
+                    assert N == 10
+                else:
+                    in_file = data
+
+                with open(in_file, 'rb') as handle:
+                    print(f'Loading Pickled Params from {in_file}...')
                     info_dict = pickle.load(handle)
-                print(f'Loaded Params from file {file}')
+
             elif isinstance(data, dict): # data is already a dict
                 print(f'Loaded Params from specified data dict')
                 info_dict = data
             else:
                 NotImplementedError
         else: # data is not specified, load from global info_dict
-            print(f'Loaded Params from global file {file}')
-            with open(file, 'rb') as handle:
-                info_dict = pickle.load(handle)
+            print(f'Loading Params from global file {file}')
+
+
+        assert B < len(info_dict['cluster_mapping'])
 
         S = 2
         A = 2

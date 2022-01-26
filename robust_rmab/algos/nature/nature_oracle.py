@@ -27,7 +27,7 @@ from robust_rmab.baselines.nature_baselines_armman import CustomPolicy
 
 class NatureOracle:
 
-    def __init__(self, data, N, S, A, B, seed, REWARD_BOUND, nature_kwargs=dict(),
+    def __init__(self, data, env_fn, N, S, A, B, seed, REWARD_BOUND, nature_kwargs=dict(),
         home_dir="", exp_name="", sampled_nature_parameter_ranges=None,
         pop_size=0, one_hot_encode=True, non_ohe_obs_dim=None, state_norm=1,
         nature_state_norm=1):
@@ -49,30 +49,14 @@ class NatureOracle:
         self.non_ohe_obs_dim = non_ohe_obs_dim
         self.state_norm = state_norm
 
-        if data == 'random':
-            self.env_fn = lambda : RandomBanditEnv(N,S,A,B,seed,REWARD_BOUND)
-
-        elif data == 'random_reset':
-            self.env_fn = lambda : RandomBanditResetEnv(N,S,A,B,seed,REWARD_BOUND)
-
-        elif data == 'armman':
-            self.env_fn = lambda : ARMMANRobustEnv(N,B,seed)
-
-        elif data == 'circulant':
-            self.env_fn = lambda : CirculantDynamicsEnv(N,B,seed)
-
-        elif data == 'counterexample':
-            self.env_fn = lambda : CounterExampleRobustEnv(N,B,seed)
-
-        elif data == 'sis':
-            self.env_fn = lambda : SISRobustEnv(N,B,pop_size,seed)
+        self.env_fn = env_fn
+        self.env = self.env_fn()
 
         self.nature_kwargs=nature_kwargs
 
         self.strat_ind = -1
 
         # this won't work if we go back to MPI, but doing it now to simplify seeding
-        self.env = self.env_fn()
         self.env.seed(seed)
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
@@ -148,14 +132,11 @@ class NatureOracle:
         #return CustomPolicy(self.sampled_nature_parameter_ranges[:,:,:,1], self.strat_ind)
 
 
-        # mpi_fork(args.cpu, is_cannon=args.cannon)  # run parallel code with mpi
-
         from robust_rmab.utils.run_utils import setup_logger_kwargs
 
         exp_name = '%s_n%is%ia%ib%.2fr%.2f'%(self.exp_name, self.N, self.S, self.A, self.B, self.REWARD_BOUND)
         data_dir = os.path.join(self.home_dir, 'data')
         logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed, data_dir=data_dir)
-        # logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed+add_to_seed, data_dir=data_dir)
 
         return self.best_response_per_cpu(agent_strats, agent_eq, prev_nature_strats, prev_nature_eq, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
 
@@ -206,7 +187,6 @@ class NatureOracle:
             sense1 = 'min' if (cluster,0) in top_B_coords else 'max'
             sense2 = 'min' if (cluster,1) in top_B_coords else 'max'
             senses = [sense1, sense2]
-            #senses = all_senses[cluster, :]
 
             assert mathprog_methods.check_feasible_range(p01p_range, p11p_range, p01a_range, p11a_range)
     
