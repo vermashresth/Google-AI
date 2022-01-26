@@ -472,20 +472,6 @@ if __name__ == '__main__':
     nature_kwargs = {}
     nature_kwargs['steps_per_epoch'] = args.nature_steps
     nature_kwargs['epochs'] = args.nature_epochs
-    nature_kwargs['init_lambda_trains'] = args.nature_init_lambda_trains
-    nature_kwargs['clip_ratio'] = args.nature_clip_ratio
-    nature_kwargs['final_train_lambdas'] = args.nature_final_train_lambdas
-    nature_kwargs['start_entropy_coeff'] = args.nature_start_entropy_coeff
-    nature_kwargs['end_entropy_coeff'] = args.nature_end_entropy_coeff
-    nature_kwargs['pi_lr_agent'] = args.nature_pi_lr_A
-    nature_kwargs['pi_lr_nature'] = args.nature_pi_lr_B
-    nature_kwargs['vf_lr_agent'] = args.nature_vf_lr_A
-    nature_kwargs['vf_lr_nature'] = args.nature_vf_lr_B
-    nature_kwargs['lm_lr'] = args.nature_lm_lr
-    nature_kwargs['train_pi_iters'] = args.nature_train_pi_iters
-    nature_kwargs['train_v_iters'] = args.nature_train_vf_iters
-    nature_kwargs['lamb_update_freq'] = args.nature_lamb_update_freq
-    nature_kwargs['ac_kwargs'] = dict(hidden_sizes=[args.hid]*args.l)
     nature_kwargs['gamma'] = args.gamma
     nature_kwargs['gurobi_time_limit'] = args.gurobi_time_limit
 
