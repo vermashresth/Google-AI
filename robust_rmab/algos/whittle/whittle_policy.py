@@ -275,18 +275,19 @@ class WhittlePolicy():
                     # self.T[arm_i,arm_state,arm_a,0] = param
                     # self.T[arm_i,arm_state,arm_a,1] = 1-param
 
-                    self.T[arm_i,arm_s, arm_a,0] = param
-                    self.T[arm_i,arm_s, arm_a,1] = 1-param
-        
+                    self.T[arm_i,arm_s, arm_a,1] = param
+                    self.T[arm_i,arm_s, arm_a,0] = 1-param
+        print('Whittle index computaion')
+        print('generated T matrix', self.T)
         # self.cluster_T = (self.T[::self.S] + self.T[1::self.S])/2
         self.cluster_T = np.copy(self.T)
         self.n_clusters = self.env.n_clusters
         # self.whittle_indices = np.array([getWhittleIndex(self.T[i], self.horizon, self.gamma)\
         #      for i in range(self.N)])
         print('Computing Whittle Indices!!!')
-        # self.whittle_indices = np.array([getWhittleIndex(self.cluster_T[i], self.horizon, self.gamma)\
-        #      for i in tqdm.tqdm(range(self.n_clusters))])
-        self.whittle_indices = getFastWhittleIndex(self.cluster_T, self.gamma)
+        self.whittle_indices = np.array([getWhittleIndex(self.cluster_T[i], self.horizon, self.gamma)\
+             for i in tqdm.tqdm(range(self.n_clusters))])
+        # self.whittle_indices = getFastWhittleIndex(self.cluster_T, self.gamma)
 
         # self.whittle_indices = np.random.uniform(0, 1*np.sum(a_nature), (self.N, self.S))
 

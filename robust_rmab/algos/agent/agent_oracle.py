@@ -131,6 +131,7 @@ class AgentOracle:
             # Whittle policy action
             wh_policy.note_env(env)
             wh_policy.learn(a_nature_env)
+            combined_wh_policy = wh_policy
 
 
         elif agent_approach == 'combine_strategies':
@@ -153,11 +154,11 @@ class AgentOracle:
                 strat_eq = nature_eq[i]
 
                 combined_wh_indices += strat_eq * wh_policy.whittle_indices
-
+                
             combined_wh_policy = WhittlePolicy(env.N, env.S, env.B, self.agent_kwargs['steps_per_epoch'], self.agent_kwargs['gamma'])
             combined_wh_policy.whittle_indices = combined_wh_indices
 
-        return wh_policy
+        return combined_wh_policy
 
 
     def simulate_reward(self, agent_pol, nature_pol, seed=0, 
