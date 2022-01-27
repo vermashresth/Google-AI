@@ -162,9 +162,10 @@ class NatureOracle:
         agent_counts = self.get_agent_counts_mixed_strategy(prev_nature_strats, prev_nature_eq, agent_strats, agent_eq, env, steps_per_epoch, n_iterations=100)
 
         # identify the top B (cluster, state) pairs in terms of avg pull per cluster size
-        top_B = np.argsort(agent_counts, axis=None)[-np.floor(env.B).astype('int'):][::-1]  # indices of top B values
+        budget = -np.floor(env.B).astype('int')
+        top_B = np.argsort(agent_counts, axis=None)[-budget:][::-1]  # indices of top B values
         top_B_coords = np.unravel_index(top_B, agent_counts.shape)
-        top_B_coords = [(top_B_coords[0][cluster], top_B_coords[1][cluster]) for cluster in range(env.n_clusters)]
+        top_B_coords = [(top_B_coords[0][i], top_B_coords[1][i]) for i in range(budget)]
 
 
         all_T = np.zeros((env.n_clusters, env.S, env.A))
@@ -200,6 +201,6 @@ class NatureOracle:
             all_T[cluster, :, :] = T_return[:, :, 1]
 
 
-        print('nature policy', all_T)
+        print('nature policy', np.round(all_T,3))
         nature_policy = CustomPolicy(all_T, -1)
         return nature_policy

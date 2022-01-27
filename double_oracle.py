@@ -88,9 +88,12 @@ class DoubleOracle:
         elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
 
-        elif data == 'armman_large':
-            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='large')
+        elif data == 'armman_large_new':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='new_large')
         
+        elif data == 'armman_large_old':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='old_large')
+
         elif data == 'armman_small':
             self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='small')
 
@@ -114,6 +117,9 @@ class DoubleOracle:
         self.sampled_nature_parameter_ranges = self.env.sample_parameter_ranges()
         # important to make sure these are always the same for all instatiations of the env
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
+
+        print('sampled', self.sampled_nature_parameter_ranges)
+        print('env', self.env.sampled_parameter_ranges)
 
 
         self.agent_oracle  = AgentOracle(data, self.env_fn, N, S, A, budget, seed, reward_bound,
@@ -421,8 +427,9 @@ if __name__ == '__main__':
                         choices=[   
                                     'random',
                                     'random_reset',
-                                    'circulant', 
-                                    'armman_large',
+                                    'circulant',
+                                    'armman_large_new',
+                                    'armman_large_old',
                                     'armman_small',
                                     'armman_very_small',
                                     'counterexample',
@@ -807,9 +814,9 @@ if __name__ == '__main__':
                     baseline_pessimistic_wi_regret,
                     baseline_optimistic_wi_regret,
                     baseline_random_agent_regret,
-                    baseline_hawkins_pess_agent_regret,
-                    baseline_hawkins_middle_agent_regret,
-                    baseline_hawkins_optimist_agent_regret
+                    # baseline_hawkins_pess_agent_regret,
+                    # baseline_hawkins_middle_agent_regret,
+                    # baseline_hawkins_optimist_agent_regret
                 ]
     bar_vals_fairness = [
                     do_fairness_no_new_nature, 
@@ -818,9 +825,9 @@ if __name__ == '__main__':
                     baseline_pessimistic_wi_fairness,
                     baseline_optimistic_wi_fairness,
                     baseline_random_agent_fairness,
-                    baseline_hawkins_pess_agent_regret,
-                    baseline_hawkins_middle_agent_regret,
-                    baseline_hawkins_optimist_agent_regret
+                    # baseline_hawkins_pess_agent_regret,
+                    # baseline_hawkins_middle_agent_regret,
+                    # baseline_hawkins_optimist_agent_regret
                 ]
     tick_names = (
                     'Double Oracle',
@@ -829,9 +836,9 @@ if __name__ == '__main__':
                     'Whittle\n(Pessimist TP)',
                     'Whittle\n(Optimist TP)',
                     'Random\nAgent',
-                    'Hawkins\nPessimist',
-                    'Hawkins\nMiddle',
-                    'Hawkins\nOptimist'
+                    # 'Hawkins\nPessimist',
+                    # 'Hawkins\nMiddle',
+                    # 'Hawkins\nOptimist'
                 )
 
     df = pd.DataFrame(np.array(bar_vals).reshape(1,-1), columns=tick_names)

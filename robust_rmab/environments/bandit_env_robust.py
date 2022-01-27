@@ -5,6 +5,8 @@ import torch
 from scipy.special import comb
 import time
 import pickle
+from robust_rmab.algos.whittle import mathprog_methods
+
 
 class ToyRobustEnv(gym.Env):
     def __init__(self, N, B, seed):
@@ -344,12 +346,15 @@ class ARMMANRobustEnv(gym.Env):
         if data is not None: # If data is explicitly specified
             if isinstance(data, str): # load from file
 
-                if data == 'large':
+                if data == 'new_large':
+                    in_file = 'new_armman_params.pickle' # n_clusters = 40, n_arms = 7668. use N = 80, B<7668
+                    assert N == 80
+                elif data == 'old_large':
                     in_file = 'armman_params.pickle' # n_clusters = 40, n_arms = 7668. use N = 80, B<7668
                     assert N == 80
-                elif data == 'small':
-                    in_file = 'armman_params_small.pickle' # n_clusters = 26, n_arms = 100. use N = 52, B<100
-                    assert N == 52
+                # elif data == 'small':
+                #     in_file = 'armman_params_small.pickle' # n_clusters = 26, n_arms = 100. use N = 52, B<100
+                #     assert N == 52
                 elif data == 'very_small':
                     in_file = 'armman_params_very_small.pickle' # n_clusters = 5, n_arms = 15, use N = 10, B<15
                     assert N == 10
@@ -373,11 +378,127 @@ class ARMMANRobustEnv(gym.Env):
 
         S = 2
         A = 2
+        self.n_clusters = info_dict['n_clusters']
+        param_ranges = info_dict['parameter_ranges']
 
-        # Setting these parameters from global loaded pickled file
+        feasible_param_ranges = np.zeros((self.n_clusters, S, A, 2))
+        num_feasible, num_infeasible = 0, 0
+
+        # ensure parameter ranges fulfill feasibility constraints
+        for cluster in range(self.n_clusters):
+            p01p_range = param_ranges[cluster,0,0,:] # [cluster, s, action, range]
+            p11p_range = param_ranges[cluster,1,0,:]
+            p01a_range = param_ranges[cluster,0,1,:]
+            p11a_range = param_ranges[cluster,1,1,:]
+
+            # ensure start at good state is beneficial
+            if not p01p_range[1] <= p11p_range[1]:
+                p01p_range[:] = p11p_range
+
+            if not p01a_range[1] <= p11a_range[1]:
+                p01a_range[:] = p11a_range
+            
+            # ensure active action is beneficial
+            if not p01a_range[1] >= p01p_range[1]:
+                p01p_range[:] = p01a_range
+            
+            if not p11a_range[1] >= p11p_range[1]:
+                p11p_range[:] = p11a_range
+
+            feasibility = mathprog_methods.check_feasible_range(p01p_range, p11p_range, p01a_range, p11a_range)
+            # print(f'cluster {cluster}, feasible {feasibility}')
+            if feasibility:
+                num_feasible += 1
+            else:
+                num_infeasible += 1
+                print('infeasible! --------------------')
+                print('p01p', p01p_range)
+                print('p11p', p11p_range)
+                print('p01a', p01a_range)
+                print('p11a', p11a_range)
+
+            # # better to be in the good state already
+            # p01a_range[1] = np.min([p01a_range[1], p11a_range[1]]) # p11a >= p01a
+            # p01p_range[1] = np.min([p01p_range[1], p11p_range[1]]) # p11p >= p01p
+
+            # # better to act than not act
+            # p01p_range[1] = np.min([p01p_range[1], p01a_range[1]])
+            # p11p_range[1] = np.min([p11p_range[1], p11a_range[1]])
+
+            # # p11a upper bound should be equal or higher than all ubs
+            # p01p_range[1] = np.min([p01p_range[1], p11a_range[1]])
+            # # p11p_range[1] = np.min([p11p_range[1], p11a_range[1]])
+            # # p01a_range[1] = np.min([p01a_range[1], p11a_range[1]])
+
+            # # lower bound no more than upper bound
+            # p01a_range[0] = np.min(p01a_range)
+            # p01p_range[0] = np.min(p01p_range)
+            # p11p_range[0] = np.min(p11p_range)
+            # p11a_range[0] = np.min(p11a_range)
+
+            # # intervene lower bound should be more than passive lower bound
+            # p01a_range[0] = np.max([p01a_range[0], p01p_range[0]])
+            # p11a_range[0] = np.max([p11a_range[0], p11p_range[0]])
+
+            # # start in good start lower bound should be more than start in bad state lb
+            # p11p_range[0] = np.max([p11p_range[0], p01p_range[0]])
+            # p11a_range[0] = np.max([p11a_range[0], p11a_range[0]])
+
+            # if not feasibility:
+            #     print('ranges after -----')
+            #     print('p01p', p01p_range)
+            #     print('p11p', p11p_range)
+            #     print('p01a', p01a_range)
+            #     print('p11a', p11a_range)
+
+            # print('--------------------------')
+            # print('p01p', p01p_range)
+            # print('p11p', p11p_range)
+            # print('p01a', p01a_range)
+            # print('p11a', p11a_range)
+            feasible_param_ranges[cluster, 0, 0, :] = p01p_range  # [cluster, s, action, range]
+            feasible_param_ranges[cluster, 1, 0, :] = p11p_range
+            feasible_param_ranges[cluster, 0, 1, :] = p01a_range
+            feasible_param_ranges[cluster, 1, 1, :] = p11a_range
+
+        #  # compute interval stats
+        #  interval_widths = []
+        #  widths_p01p = []
+        #  widths_p11p = []
+        #  widths_p01a = []
+        #  widths_p11a = []
+        #  for cluster in range(self.n_clusters):
+        #      p01p_range = param_ranges[cluster,0,0,:] # [cluster, s, action, range]
+        #      p11p_range = param_ranges[cluster,1,0,:]
+        #      p01a_range = param_ranges[cluster,0,1,:]
+        #      p11a_range = param_ranges[cluster,1,1,:]
+        #      interval_widths.append(p01p_range[1] - p01p_range[0])
+        #      interval_widths.append(p11p_range[1] - p11p_range[0])
+        #      interval_widths.append(p01a_range[1] - p01a_range[0])
+        #      interval_widths.append(p11a_range[1] - p11a_range[0])
+        #      widths_p01p.append(p01p_range[1] - p01p_range[0])
+        #      widths_p11p.append(p11p_range[1] - p11p_range[0])
+        #      widths_p01a.append(p01a_range[1] - p01a_range[0])
+        #      widths_p11a.append(p11a_range[1] - p11a_range[0])
+
+        #  avg_interval_width = np.mean(interval_widths)
+        #  std_interval_width = np.std(interval_widths)
+        #  print(f'avg interval width {avg_interval_width:.3f} std {std_interval_width:.3f}')
+        #  print(f'p01p width avg {np.mean(widths_p01p):.3f} std {np.std(widths_p01p):.3f}')
+        #  print(f'p11p width avg {np.mean(widths_p11p):.3f} std {np.std(widths_p11p):.3f}')
+        #  print(f'p01a width avg {np.mean(widths_p01a):.3f} std {np.std(widths_p01a):.3f}')
+        #  print(f'p11a width avg {np.mean(widths_p11a):.3f} std {np.std(widths_p11a):.3f}')
+
+
+        #  # print(f'{num_feasible} feasible, {num_infeasible} infeasible')
+        #  import sys
+        #  sys.exit(0)
+
+        self.PARAMETER_RANGES = feasible_param_ranges
+
+        # Set these parameters from global loaded pickled file
         # TODO: make this more clean
-        self.n_clusters, self.cluster_mapping, self.max_cluster_size, self.PARAMETER_RANGES =\
-            info_dict['n_clusters'], info_dict['cluster_mapping'], info_dict['max_cluster_size'], info_dict['parameter_ranges']
+        self.cluster_mapping, self.max_cluster_size = info_dict['cluster_mapping'], info_dict['max_cluster_size']
  
         
         assert self.n_clusters*S == N, f'n_clusters = {self.n_clusters}, S={S}, N={N}. self.n_clusters*S should be same as N'
