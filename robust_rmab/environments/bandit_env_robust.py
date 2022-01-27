@@ -358,6 +358,9 @@ class ARMMANRobustEnv(gym.Env):
                 elif data == 'very_small':
                     in_file = 'armman_params_very_small.pickle' # n_clusters = 5, n_arms = 15, use N = 10, B<15
                     assert N == 10
+                elif data =='toy':
+                    in_file = 'armman_params_toy.pickle' # n_clusters = 2, n_arms = 2, use N = 4, B<2
+                    assert N == 6
                 else:
                     in_file = data
 
@@ -670,8 +673,8 @@ class ARMMANRobustEnv(gym.Env):
                         param = self.sampled_parameter_ranges[cluster_idx, state, action, 1]
 
                     # Set env's current transitions to nature bounded actions
-                    self.T[cluster_idx,state, action,0] = param
-                    self.T[cluster_idx,state, action,1] = 1-param
+                    self.T[cluster_idx,state, action,1] = param
+                    self.T[cluster_idx,state, action,0] = 1-param
 
         # cluster_T stores TP at cluster-state level
         self.cluster_T = np.copy(self.T)
@@ -788,8 +791,8 @@ class ARMMANRobustEnv(gym.Env):
                     
                     # semi-annoying specific code to make sure we set the right entries for each state
                     
-                    self.T[arm_i,arm_state,arm_a,0] = param
-                    self.T[arm_i,arm_state,arm_a,1] = 1-param
+                    self.T[arm_i,arm_state,arm_a,1] = param
+                    self.T[arm_i,arm_state,arm_a,0] = 1-param
 
 
         return np.copy(self.T)
