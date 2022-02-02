@@ -18,6 +18,7 @@ import os, sys
 
 from robust_rmab.algos.whittle import mathprog_methods
 from robust_rmab.utils.logx import EpochLogger
+from robust_rmab.utils.run_utils import setup_logger_kwargs
 #from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv
 from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
 
@@ -131,14 +132,12 @@ class NatureOracle:
         # temporarily just return a dummy strategy for Nature Oracle (before we implement the QP-based approach)
         #return CustomPolicy(self.sampled_nature_parameter_ranges[:,:,:,1], self.strat_ind)
 
-
-        from robust_rmab.utils.run_utils import setup_logger_kwargs
-
         exp_name = '%s_n%is%ia%ib%.2fr%.2f'%(self.exp_name, self.N, self.S, self.A, self.B, self.REWARD_BOUND)
         data_dir = os.path.join(self.home_dir, 'data')
         logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed, data_dir=data_dir)
 
         return self.best_response_per_cpu(agent_strats, agent_eq, prev_nature_strats, prev_nature_eq, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
+
 
     def best_response_per_cpu(self, agent_strats, agent_eq, prev_nature_strats, prev_nature_eq,
         seed=0,
@@ -201,6 +200,6 @@ class NatureOracle:
             all_T[cluster, :, :] = T_return[:, :, 1]
 
 
-        print('nature policy', np.round(all_T,3))
+        print('nature policy', np.round(all_T, 3))
         nature_policy = CustomPolicy(all_T, -1)
         return nature_policy

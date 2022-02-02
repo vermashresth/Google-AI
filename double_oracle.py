@@ -87,12 +87,18 @@ class DoubleOracle:
 
         elif data == 'random_reset':
             self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
+        
+        elif data == 'armman_large_old':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='old_large')
 
         elif data == 'armman_large_new':
             self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='new_large')
         
-        elif data == 'armman_large_old':
-            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='old_large')
+        elif data == 'armman_large_bootstrapped':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='large_bootstrapped')
+
+        elif data == 'armman_bootstrapped_eq_size':
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='bootstrapped_eq_size')
 
         elif data == 'armman_small':
             self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='small')
@@ -430,6 +436,8 @@ if __name__ == '__main__':
                                     'circulant',
                                     'armman_large_new',
                                     'armman_large_old',
+                                    'armman_large_bootstrapped',
+                                    'armman_bootstrapped_eq_size',
                                     'armman_small',
                                     'armman_very_small',
                                     'counterexample',
@@ -808,7 +816,7 @@ if __name__ == '__main__':
     print('n_targets {}, horizon {}, budget {}'.format(do.N, horizon, budget))
 
     bar_vals = [
-                    do_regret_no_new_nature, 
+                    #do_regret_no_new_nature, 
                     do_regret, 
                     baseline_middle_wi_regret, 
                     baseline_pessimistic_wi_regret,
@@ -819,7 +827,7 @@ if __name__ == '__main__':
                     # baseline_hawkins_optimist_agent_regret
                 ]
     bar_vals_fairness = [
-                    do_fairness_no_new_nature, 
+                    #do_fairness_no_new_nature, 
                     do_fairness, 
                     baseline_middle_wi_fairness, 
                     baseline_pessimistic_wi_fairness,
@@ -830,8 +838,8 @@ if __name__ == '__main__':
                     # baseline_hawkins_optimist_agent_regret
                 ]
     tick_names = (
-                    'Double Oracle',
-                    'Double Oracle\n+New', 
+                    #'Double Oracle',
+                    'Double Oracle',  # + New
                     'Whittle\n(Middle TP)', 
                     'Whittle\n(Pessimist TP)',
                     'Whittle\n(Optimist TP)',
@@ -860,7 +868,7 @@ if __name__ == '__main__':
     plt.ylabel('Mean regret')
     plt.title('N_arms {}, N_clusters {}, budget {}, horizon {}, max_do_epochs {}, data {}'.format(do.env.n_arms, do.env.n_clusters, budget, horizon, max_epochs_double_oracle, args.data))
     plt.tight_layout()
-    plt.savefig(os.path.join(args.home_dir, 'img/regret_{}_n{}_b{}_h{}_epoch{}_data{}_p{}_s{}.pdf'.format(args.save_string, do.N, budget, horizon, max_epochs_double_oracle, args.data, args.pop_size, args.seed)))
+    plt.savefig(os.path.join(args.home_dir, 'img/regret_{}_n{}_b{}_h{}_epoch{}_data{}_agent{}_p{}_s{}.pdf'.format(args.save_string, do.N, budget, horizon, max_epochs_double_oracle, args.data, args.agent_approach, args.pop_size, args.seed)))
     
     plt.figure()
     plt.bar(x, bar_vals_fairness)
