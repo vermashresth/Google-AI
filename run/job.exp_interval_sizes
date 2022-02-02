@@ -1,0 +1,28 @@
+# data="armman_very_small"
+data="armman_large"
+# small, large
+save_string="interval_size_new"
+N=20
+B=30
+seed=0
+cdir="."
+no_hawkins=1
+S=2
+max_epochs_double_oracle=5
+agent_approach='combine_strategies'
+
+use_custom_data=1
+n_arms=100
+interval_size="small"
+for interval_size in small medium large
+    do
+    printf "\n\n\n\n\n Running interval size $interval_size \n\n"
+    for seed in {1..5}
+    do
+    printf "\n\n\n\n Running Seed $seed \n\n"
+    bash run_do_micro.sh ${cdir} ${seed} 1 ${data} ${save_string} ${N} ${B} ${no_hawkins} ${S} ${max_epochs_double_oracle} ${agent_approach} ${use_custom_data} ${n_arms} ${interval_size}
+    done
+    done
+
+
+
