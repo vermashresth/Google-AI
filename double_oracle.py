@@ -33,6 +33,7 @@ from robust_rmab.baselines.nature_baselines_armman import   (
                             OptimisticNaturePolicy
                         )
 
+from feasible_range import get_armman_param_ranges
 
 
 
@@ -82,31 +83,40 @@ class DoubleOracle:
 
         self.nature_state_norm = 1
 
-        if data == 'random':
-            self.env_fn = lambda : RandomBanditEnv(N,S,A,budget,seed,reward_bound)
+        if isinstance(data, str):
+            data_name = data
+            if data == 'random':
+                self.env_fn = lambda : RandomBanditEnv(N,S,A,budget,seed,reward_bound)
 
-        elif data == 'random_reset':
-            self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
+            elif data == 'random_reset':
+                self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
 
-        elif data == 'armman_large':
-            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='large')
-        
-        elif data == 'armman_small':
-            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='small')
+            elif data == 'armman_large':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='large')
+            
+            elif data == 'armman_small':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='small')
 
-        elif data == 'armman_very_small':
-            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='very_small')
+            elif data == 'armman_very_small':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='very_small')
+            
+            elif data == 'armman_toy':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='toy')
 
-        elif data == 'circulant':
-            self.env_fn = lambda : CirculantDynamicsEnv(N,budget,seed)
+            elif data == 'circulant':
+                self.env_fn = lambda : CirculantDynamicsEnv(N,budget,seed)
 
-        elif data == 'counterexample':
-            self.env_fn = lambda : CounterExampleRobustEnv(N,budget,seed)
+            elif data == 'counterexample':
+                self.env_fn = lambda : CounterExampleRobustEnv(N,budget,seed)
 
-        elif data == 'sis':
-            self.env_fn = lambda : SISRobustEnv(N,budget,pop_size,seed)
-            self.nature_state_norm = 1
-
+            elif data == 'sis':
+                self.env_fn = lambda : SISRobustEnv(N,budget,pop_size,seed)
+                self.nature_state_norm = 1
+            else:
+                raise Exception(f'data {data} not implemented')
+        elif isinstance(data, dict):
+            self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data=data)
+            data_name = 'armman'
         else:
             raise Exception(f'data {data} not implemented')
 
@@ -116,14 +126,14 @@ class DoubleOracle:
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
 
 
-        self.agent_oracle  = AgentOracle(data, self.env_fn, N, S, A, budget, seed, reward_bound,
+        self.agent_oracle  = AgentOracle(data_name, self.env_fn, N, S, A, budget, seed, reward_bound,
                              agent_kwargs=agent_kwargs, home_dir=home_dir, exp_name=exp_name,
                              sampled_nature_parameter_ranges = self.sampled_nature_parameter_ranges,
                              pop_size=self.pop_size, one_hot_encode=one_hot_encode, state_norm=state_norm,
                              non_ohe_obs_dim=non_ohe_obs_dim)
  
 
-        self.nature_oracle = NatureOracle(data, self.env_fn, N, S, A, budget, seed, reward_bound,
+        self.nature_oracle = NatureOracle(data_name, self.env_fn, N, S, A, budget, seed, reward_bound,
                              nature_kwargs=nature_kwargs, home_dir=home_dir, exp_name=exp_name,
                              sampled_nature_parameter_ranges = self.sampled_nature_parameter_ranges,
                              pop_size=self.pop_size, one_hot_encode=one_hot_encode, state_norm=state_norm,
@@ -414,6 +424,10 @@ if __name__ == '__main__':
     parser.add_argument('--gurobi_time_limit', type=float, default=10, help="Gurobi max solve time (in sec)")
     parser.add_argument('--no_hawkins', type=int, default=0, help="If set, will not run Hawkins baselines")
 
+    parser.add_argument('--use_custom_data', type=int, default=0, help="If set, will use custom data dict for armman")
+    parser.add_argument('--interval_size', type=str, default=-1, help="Size of interval")
+    parser.add_argument('--n_arms', type=int, default=0, help="Number of arms in custom data")
+
     parser.add_argument('--home_dir', type=str, default='.', help="Home directory for experiments")
     parser.add_argument('--cannon', type=int, default=0, help="Flag used for running experiments on batched slurm-based HPC resources. Leave at 0 for small experiments.")
     parser.add_argument('--n_perturb', type=int, default=3, help="Number of copies of the RLvMid baseline that should be trained/compared against. Each copy will train against a small perturbation of a mid nature strategy.")
@@ -428,6 +442,7 @@ if __name__ == '__main__':
                                     'armman_large',
                                     'armman_small',
                                     'armman_very_small',
+                                    'armman_toy',
                                     'counterexample',
                                     'sis'
                                 ])
@@ -491,9 +506,30 @@ if __name__ == '__main__':
         non_ohe_obs_dim = 1
         state_norm = args.pop_size
 
+    if args.use_custom_data:
+        n_arms = args.n_arms
+        print(f'Finding Feasable Params for n_arms:{n_arms}, seed:{seed}, interval:{args.interval_size}!')
+        param_ranges = get_armman_param_ranges(N//S, seed=args.seed, size_type=args.interval_size)
+        print('Found Feasable params!!')
+        exp_data = {}
+        exp_data['parameter_ranges'] = param_ranges
+        exp_data['n_clusters'] = N//S
+        mapping = np.zeros(n_arms)
+        base_idx = np.random.choice(range(n_arms), exp_data['n_clusters'],replace=False)
+        mapping[base_idx] = np.arange(exp_data['n_clusters'])
+        other_idx = np.arange(n_arms)[~np.isin(np.arange(n_arms), base_idx)]
+        other_mapping = list(np.random.choice(range(exp_data['n_clusters']),
+                                                         n_arms-exp_data['n_clusters'], replace=True))
+        mapping[other_idx] = other_mapping                                                        
+        exp_data['cluster_mapping'] = list(mapping.astype(int))
+        print(pd.Series(exp_data['cluster_mapping']).value_counts())
+        exp_data['max_cluster_size'] = pd.Series(exp_data['cluster_mapping']).value_counts().max()
+        
+    else:
+        exp_data = args.data
 
 
-    do = DoubleOracle(data=args.data, N=N, budget=budget, horizon=horizon, 
+    do = DoubleOracle(data=exp_data, N=N, budget=budget, horizon=horizon, 
                     max_epochs_double_oracle=max_epochs_double_oracle,
                     S=S, A=A, seed=seed, reward_bound=reward_bound,
                     home_dir=home_dir, exp_name=exp_name, gamma=gamma,
@@ -889,7 +925,7 @@ if __name__ == '__main__':
     save_path = f'{args.home_dir}/logs/model_dump'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
-    save_file = f'{save_path}/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}.pickle'
+    save_file = f'{save_path}/{args.save_string}_n{do.N}_b{budget}_h{horizon}_epoch{max_epochs_double_oracle}_data{args.data}_seed{args.seed}_customdata_{args.use_custom_data}_narms{args.n_arms}_interval{args.interval_size}.pickle'
 
     with open(save_file, 'wb') as f:
         print('Saving model at ', save_file)
