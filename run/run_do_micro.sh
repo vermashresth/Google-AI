@@ -20,4 +20,8 @@ python3 ${1}/double_oracle.py --hid 16 -l 2 --gamma 0.9 --cpu 1 \
 \
 --nature_steps 10 \
 --nature_epochs 1 \
---gurobi_time_limit 5
+--gurobi_time_limit 5 \
+\
+--use_custom_data ${12} \
+--n_arms ${13} \
+--interval_size ${14}
