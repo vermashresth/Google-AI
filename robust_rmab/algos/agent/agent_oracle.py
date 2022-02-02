@@ -95,7 +95,6 @@ class AgentOracle:
         o = o.reshape(-1)
         torch_o = torch.as_tensor(o, dtype=torch.float32)
 
-
         # Sample a nature policy
         nature_eq = np.array(nature_eq)
         nature_eq[nature_eq < 0] = 0
@@ -119,9 +118,8 @@ class AgentOracle:
             print('Nature opponent chosen: ', nature_eq, nature_pol)
 
             a_nature = nature_pol.get_nature_action(torch_o)
-
             a_nature_env = nature_pol.bound_nature_actions(a_nature, state=o, reshape=True)
-            print('nature transitions:', a_nature_env)
+            # print('nature transitions:', a_nature_env)
 
             # Create Whittle Policy
             wh_policy = WhittlePolicy(env.N, env.S, env.B,

@@ -90,18 +90,24 @@ class DoubleOracle:
 
             elif data == 'random_reset':
                 self.env_fn = lambda : RandomBanditResetEnv(N,S,A,budget,seed,reward_bound)
-
-            elif data == 'armman_large':
-                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='large')
             
+            elif data == 'armman_large_old':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='old_large')
+
+            elif data == 'armman_large_new':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='new_large')
+            
+            elif data == 'armman_large_bootstrapped':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='large_bootstrapped')
+
+            elif data == 'armman_bootstrapped_eq_size':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='bootstrapped_eq_size')
+
             elif data == 'armman_small':
                 self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='small')
 
             elif data == 'armman_very_small':
                 self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='very_small')
-            
-            elif data == 'armman_toy':
-                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='toy')
 
             elif data == 'circulant':
                 self.env_fn = lambda : CirculantDynamicsEnv(N,budget,seed)
@@ -112,8 +118,6 @@ class DoubleOracle:
             elif data == 'sis':
                 self.env_fn = lambda : SISRobustEnv(N,budget,pop_size,seed)
                 self.nature_state_norm = 1
-            else:
-                raise Exception(f'data {data} not implemented')
         elif isinstance(data, dict):
             self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data=data)
             data_name = 'armman'
@@ -124,6 +128,9 @@ class DoubleOracle:
         self.sampled_nature_parameter_ranges = self.env.sample_parameter_ranges()
         # important to make sure these are always the same for all instatiations of the env
         self.env.sampled_parameter_ranges = self.sampled_nature_parameter_ranges
+
+        print('sampled', self.sampled_nature_parameter_ranges)
+        print('env', self.env.sampled_parameter_ranges)
 
 
         self.agent_oracle  = AgentOracle(data_name, self.env_fn, N, S, A, budget, seed, reward_bound,
@@ -438,8 +445,11 @@ if __name__ == '__main__':
                         choices=[   
                                     'random',
                                     'random_reset',
-                                    'circulant', 
-                                    'armman_large',
+                                    'circulant',
+                                    'armman_large_new',
+                                    'armman_large_old',
+                                    'armman_large_bootstrapped',
+                                    'armman_bootstrapped_eq_size',
                                     'armman_small',
                                     'armman_very_small',
                                     'armman_toy',
@@ -840,37 +850,37 @@ if __name__ == '__main__':
     print('n_targets {}, horizon {}, budget {}'.format(do.N, horizon, budget))
 
     bar_vals = [
-                    do_regret_no_new_nature, 
+                    #do_regret_no_new_nature, 
                     do_regret, 
                     baseline_middle_wi_regret, 
                     baseline_pessimistic_wi_regret,
                     baseline_optimistic_wi_regret,
                     baseline_random_agent_regret,
-                    baseline_hawkins_pess_agent_regret,
-                    baseline_hawkins_middle_agent_regret,
-                    baseline_hawkins_optimist_agent_regret
+                    # baseline_hawkins_pess_agent_regret,
+                    # baseline_hawkins_middle_agent_regret,
+                    # baseline_hawkins_optimist_agent_regret
                 ]
     bar_vals_fairness = [
-                    do_fairness_no_new_nature, 
+                    #do_fairness_no_new_nature, 
                     do_fairness, 
                     baseline_middle_wi_fairness, 
                     baseline_pessimistic_wi_fairness,
                     baseline_optimistic_wi_fairness,
                     baseline_random_agent_fairness,
-                    baseline_hawkins_pess_agent_regret,
-                    baseline_hawkins_middle_agent_regret,
-                    baseline_hawkins_optimist_agent_regret
+                    # baseline_hawkins_pess_agent_regret,
+                    # baseline_hawkins_middle_agent_regret,
+                    # baseline_hawkins_optimist_agent_regret
                 ]
     tick_names = (
-                    'Double Oracle',
-                    'Double Oracle\n+New', 
+                    #'Double Oracle',
+                    'Double Oracle',  # + New
                     'Whittle\n(Middle TP)', 
                     'Whittle\n(Pessimist TP)',
                     'Whittle\n(Optimist TP)',
                     'Random\nAgent',
-                    'Hawkins\nPessimist',
-                    'Hawkins\nMiddle',
-                    'Hawkins\nOptimist'
+                    # 'Hawkins\nPessimist',
+                    # 'Hawkins\nMiddle',
+                    # 'Hawkins\nOptimist'
                 )
 
     df = pd.DataFrame(np.array(bar_vals).reshape(1,-1), columns=tick_names)
@@ -892,7 +902,7 @@ if __name__ == '__main__':
     plt.ylabel('Mean regret')
     plt.title('N_arms {}, N_clusters {}, budget {}, horizon {}, max_do_epochs {}, data {}'.format(do.env.n_arms, do.env.n_clusters, budget, horizon, max_epochs_double_oracle, args.data))
     plt.tight_layout()
-    plt.savefig(os.path.join(args.home_dir, 'img/regret_{}_n{}_b{}_h{}_epoch{}_data{}_p{}_s{}.pdf'.format(args.save_string, do.N, budget, horizon, max_epochs_double_oracle, args.data, args.pop_size, args.seed)))
+    plt.savefig(os.path.join(args.home_dir, 'img/regret_{}_n{}_b{}_h{}_epoch{}_data{}_agent{}_p{}_s{}.pdf'.format(args.save_string, do.N, budget, horizon, max_epochs_double_oracle, args.data, args.agent_approach, args.pop_size, args.seed)))
     
     plt.figure()
     plt.bar(x, bar_vals_fairness)

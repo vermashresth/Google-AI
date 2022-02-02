@@ -18,6 +18,7 @@ import os, sys
 
 from robust_rmab.algos.whittle import mathprog_methods
 from robust_rmab.utils.logx import EpochLogger
+from robust_rmab.utils.run_utils import setup_logger_kwargs
 #from robust_rmab.environments.bandit_env import RandomBanditEnv, Eng1BanditEnv, RandomBanditResetEnv, CirculantDynamicsEnv
 from robust_rmab.environments.bandit_env_robust import ToyRobustEnv, ARMMANRobustEnv, CounterExampleRobustEnv, SISRobustEnv
 
@@ -131,14 +132,12 @@ class NatureOracle:
         # temporarily just return a dummy strategy for Nature Oracle (before we implement the QP-based approach)
         #return CustomPolicy(self.sampled_nature_parameter_ranges[:,:,:,1], self.strat_ind)
 
-
-        from robust_rmab.utils.run_utils import setup_logger_kwargs
-
         exp_name = '%s_n%is%ia%ib%.2fr%.2f'%(self.exp_name, self.N, self.S, self.A, self.B, self.REWARD_BOUND)
         data_dir = os.path.join(self.home_dir, 'data')
         logger_kwargs = setup_logger_kwargs(self.exp_name, self.seed, data_dir=data_dir)
 
         return self.best_response_per_cpu(agent_strats, agent_eq, prev_nature_strats, prev_nature_eq, seed=self.seed, logger_kwargs=logger_kwargs, **self.nature_kwargs)
+
 
     def best_response_per_cpu(self, agent_strats, agent_eq, prev_nature_strats, prev_nature_eq,
         seed=0,
@@ -162,9 +161,10 @@ class NatureOracle:
         agent_counts = self.get_agent_counts_mixed_strategy(prev_nature_strats, prev_nature_eq, agent_strats, agent_eq, env, steps_per_epoch, n_iterations=100)
 
         # identify the top B (cluster, state) pairs in terms of avg pull per cluster size
-        top_B = np.argsort(agent_counts, axis=None)[-np.floor(env.B).astype('int'):][::-1]  # indices of top B values
+        budget = -np.floor(env.B).astype('int')
+        top_B = np.argsort(agent_counts, axis=None)[-budget:][::-1]  # indices of top B values
         top_B_coords = np.unravel_index(top_B, agent_counts.shape)
-        top_B_coords = [(top_B_coords[0][cluster], top_B_coords[1][cluster]) for cluster in range(env.n_clusters)]
+        top_B_coords = [(top_B_coords[0][i], top_B_coords[1][i]) for i in range(budget)]
 
 
         all_T = np.zeros((env.n_clusters, env.S, env.A))
@@ -200,6 +200,6 @@ class NatureOracle:
             all_T[cluster, :, :] = T_return[:, :, 1]
 
 
-        print('nature policy', all_T)
+        print('nature policy', np.round(all_T, 3))
         nature_policy = CustomPolicy(all_T, -1)
         return nature_policy
