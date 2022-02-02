@@ -160,7 +160,8 @@ class DoubleOracle:
         agent_eq    = np.ones(len(self.agent_strategies))/len(self.agent_strategies) # account for baselines
         # agent_eq    = np.array([1.]) # account for baselines
         nature_eq   = np.ones(len(self.nature_strategies))/len(self.nature_strategies)
-
+        agent_br_log = []
+        nature_br_log = []
         # repeat until convergence
         converged = False
         n_epochs = 0
@@ -176,8 +177,10 @@ class DoubleOracle:
 
             # in first epoch, defender response is ideal defender for initial attractiveness
             agent_br = self.agent_oracle.best_response(self.nature_strategies, nature_eq, add_to_seed)
+            agent_br_log.append((agent_br, self.nature_strategies.copy(), nature_eq.copy()))
             # self.update_payoffs_agent(agent_br)
             nature_br = self.nature_oracle.best_response(self.agent_strategies, agent_eq, self.nature_strategies, nature_eq)
+            nature_br_log.append((nature_br, self.agent_strategies.copy(), agent_eq.copy()))
             # self.update_payoffs_nature(nature_br)
             print('#'*20)
             print('Agent BR: ', agent_br)
@@ -216,7 +219,7 @@ class DoubleOracle:
 
         print('#'*100, '\n\n', 'Done with DO Run')
 
-        return agent_eq, nature_eq
+        return agent_eq, nature_eq, {'agent_br_log': agent_br_log, 'nature_br_log': nature_br_log}
 
 
     def compute_regret(self, agent_s, nature_s, max_reward):
@@ -559,7 +562,7 @@ if __name__ == '__main__':
     print('Agent strategies', do.agent_strategies)
     print('Nature strategies', do.nature_strategies)
 
-    agent_eq, nature_eq = do.run()
+    agent_eq, nature_eq, do_logs = do.run()
 
     print('\n\n\n\n\n-----------------------')
     print('Completed Double Oracle')
@@ -876,7 +879,13 @@ if __name__ == '__main__':
                                      'random':baseline_random_agent
                                     },
                   'payoffs': do.payoffs, 'regret': regret, 'eq_regret': do_regret,
-                  'N': do.N, 'b':budget}
+                  'do_logs': do_logs,
+                  'N': do.N, 'b':budget,
+                  'figs':
+                        {'agent_variant_names': tick_names,
+                        'agent_variant_regrets': bar_vals,
+                        },
+    }
     save_path = f'{args.home_dir}/logs/model_dump'
     if not os.path.exists(save_path):
         os.makedirs(save_path)
