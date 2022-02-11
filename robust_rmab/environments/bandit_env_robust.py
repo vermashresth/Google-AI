@@ -355,9 +355,24 @@ class ARMMANRobustEnv(gym.Env):
                 elif data == 'large_bootstrapped':
                     in_file = 'bootstrapped_armman_params.pickle' # n_clusters = 40, n_arms = 15336
                     assert N == 80
+                elif data == 'bootstrapped_small_variance': # equal cluster sizes
+                    in_file = 'bootstrapped_armman_params_small_variance_cluster_size.pickle'
+                    # n_clusters = 40, n_arms = 15320
                 elif data == 'bootstrapped_eq_size': # equal cluster sizes
                     in_file = 'bootstrapped_armman_params_equal_cluster_size.pickle'
                     # n_clusters = 40, n_arms = 15320
+                    assert N == 80
+                elif data == 'bootstrapped_scale70':
+                    in_file = 'bootstrapped_armman_params_scaleup70.pickle'
+                    # n_clusters = 40, n_arms = 1072400
+                    assert N == 80
+                elif data == 'bootstrapped_scale20':
+                    in_file = 'bootstrapped_armman_params_scaleup20.pickle'
+                    # n_clusters = 40, n_arms = 1072400
+                    assert N == 80
+                elif data == 'bootstrapped_scale10':
+                    in_file = 'bootstrapped_armman_params_scaleup10.pickle'
+                    # n_clusters = 40, n_arms = 153200
                     assert N == 80
                 # elif data == 'small':
                 #     in_file = 'armman_params_small.pickle' # n_clusters = 26, n_arms = 100. use N = 52, B<100

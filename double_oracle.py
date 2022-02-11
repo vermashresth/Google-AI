@@ -103,6 +103,18 @@ class DoubleOracle:
             elif data == 'armman_bootstrapped_eq_size':
                 self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='bootstrapped_eq_size')
 
+            elif data == 'armman_bootstrapped_small_variance':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='bootstrapped_small_variance')
+
+            elif data == 'armman_bootstrapped_scale70':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='bootstrapped_scale70')
+
+            elif data == 'armman_bootstrapped_scale20':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='bootstrapped_scale20')
+
+            elif data == 'armman_bootstrapped_scale10':
+                self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='bootstrapped_scale10')
+
             elif data == 'armman_small':
                 self.env_fn = lambda : ARMMANRobustEnv(N,budget,seed,data='small')
 
@@ -430,6 +442,9 @@ if __name__ == '__main__':
     parser.add_argument('--nature_epochs', type=int, default=100, help="Number of training epochs")
     parser.add_argument('--gurobi_time_limit', type=float, default=10, help="Gurobi max solve time (in sec)")
     parser.add_argument('--no_hawkins', type=int, default=0, help="If set, will not run Hawkins baselines")
+    
+    parser.add_argument('--variation', type=int, default=0, help="Variation in cluster size")
+    #parser.add_argument('--scale_n', type=float, default=1, help="Scale the number of beneficiaries by multiple (for experiments: run on real data but larger N)")
 
     parser.add_argument('--use_custom_data', type=int, default=0, help="If set, will use custom data dict for armman")
     parser.add_argument('--interval_size', type=str, default=-1, help="Size of interval")
@@ -450,6 +465,10 @@ if __name__ == '__main__':
                                     'armman_large_old',
                                     'armman_large_bootstrapped',
                                     'armman_bootstrapped_eq_size',
+                                    'armman_bootstrapped_small_variance',
+                                    'armman_bootstrapped_scale10',
+                                    'armman_bootstrapped_scale20',
+                                    'armman_bootstrapped_scale70',
                                     'armman_small',
                                     'armman_very_small',
                                     'armman_toy',
@@ -488,6 +507,7 @@ if __name__ == '__main__':
     exp_name=args.exp_name
     max_epochs_double_oracle=args.max_epochs_double_oracle
     gamma = args.gamma
+    variation = args.variation
 
     n_perturb = args.n_perturb
 
@@ -884,7 +904,7 @@ if __name__ == '__main__':
                 )
 
     df = pd.DataFrame(np.array(bar_vals).reshape(1,-1), columns=tick_names)
-    file_name = os.path.join(args.home_dir, 'logs/regrets/regret_{}_n{}_b{}_h{}_epoch{}_data{}_p{}_s{}.csv'.format(args.save_string, do.N, budget, horizon, max_epochs_double_oracle, args.data, args.pop_size, args.seed))
+    file_name = os.path.join(args.home_dir, 'logs/regrets/regret_{}_n{}_b{}_h{}_epoch{}_data{}_p{}_s{}_use_custom_data{}_n_arms{}_interval{}.csv'.format(args.save_string, do.N, budget, horizon, max_epochs_double_oracle, args.data, args.pop_size, args.seed, args.use_custom_data, args.n_arms, args.interval_size))
     df.to_csv(file_name, index=False)
 
     print('regrets', tick_names)
@@ -913,8 +933,8 @@ if __name__ == '__main__':
     plt.title('N {}, budget {}, horizon {}, max_epochs {}, data {}'.format(do.N, budget, horizon, max_epochs_double_oracle, args.data))
     plt.tight_layout()
 
-    if not args.cannon:
-        plt.show()
+    #if not args.cannon:
+    #    plt.show()
     print('saving model')
     model_dict = {'agent_eq': agent_eq, 'nature_eq': nature_eq,
                   'agent_strategies': do.agent_strategies[:-n_baseline_comparisons], 'nature_strategies': do.nature_strategies,

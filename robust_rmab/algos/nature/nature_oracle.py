@@ -70,11 +70,11 @@ class NatureOracle:
             arms_in_cluster[cluster].append(arm)
         self.arms_in_cluster = arms_in_cluster
 
-    def get_agent_counts(self, agent_pol, nature_pol, env, steps_per_epoch, n_iterations=100):
+    def get_agent_counts(self, nature_pol, agent_pol, env, steps_per_epoch, n_iterations=100):
         """ given pure strategy for agent and nature,
         estimate the probability that each (cluster, state) is pulled """
 
-        return self.get_agent_counts_mixed_strategy([agent_pol], [1.0], [nature_pol], [1.0], env, steps_per_epochs, n_iterations=n_iterations)
+        return self.get_agent_counts_mixed_strategy([nature_pol], [1.0], [agent_pol], [1.0], env, steps_per_epochs, n_iterations=n_iterations)
 
     def get_agent_counts_mixed_strategy(self, nature_strats, nature_eq, agent_strats, agent_eq, env, steps_per_epoch, n_iterations=100):
         """ given MSNE for agent and nature, estimate the probability that an individual in each (cluster, state) is pulled
@@ -84,6 +84,15 @@ class NatureOracle:
 
         INTERVENE = 1
         counter = np.zeros((self.env.n_clusters, self.S))  # n_clusters, n_states
+
+        # ensure valid probabilities
+        nature_eq = np.array(nature_eq)
+        nature_eq[nature_eq < 0] = 0
+        nature_eq = nature_eq / nature_eq.sum()
+
+        agent_eq = np.array(agent_eq)
+        agent_eq[agent_eq < 0] = 0
+        agent_eq = agent_eq / agent_eq.sum()
 
         # iterate through environment to track the actions of our agent policy
         for epoch in range(n_iterations):

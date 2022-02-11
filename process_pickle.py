@@ -46,6 +46,60 @@ n_clusters = info_dict['n_clusters']
 param_ranges = info_dict['parameter_ranges']
 
 
+#########################
+
+# scale up number of individuals
+scale_up_factor = 20
+new_cluster_mapping = np.repeat(info_dict['cluster_mapping'], scale_up_factor)
+
+new_info_dict = {
+  'n_clusters': n_clusters,
+  'cluster_mapping': new_cluster_mapping,
+  'parameter_ranges': info_dict['parameter_ranges'],
+  'max_cluster_size': info_dict['max_cluster_size'] * scale_up_factor,
+  }
+
+f = open(f'bootstrapped_armman_params_scaleup{scale_up_factor}.pickle', 'wb')
+pickle.dump(new_info_dict, f)
+
+sys.exit(0)
+
+########################
+
+# use clusters with medium equality in cluster sizes
+orig_n_indiv = len(info_dict['cluster_mapping'])
+eq_cluster_size = orig_n_indiv // n_clusters
+new_cluster_mapping = []
+
+# count custer sizes
+cluster_size = {}
+for cluster in range(n_clusters):
+    cluster_size[cluster] = 0
+for indiv, cluster in enumerate(info_dict['cluster_mapping']):
+    cluster_size[cluster] += 1
+
+for cluster in range(n_clusters):
+    new_cluster_size = int((cluster_size[cluster] + eq_cluster_size) / 2)
+    new_cluster_mapping.append([cluster] * new_cluster_size)
+
+new_cluster_mapping = [x for sublist in new_cluster_mapping for x in sublist]
+new_cluster_mapping = np.array(new_cluster_mapping)
+
+new_info_dict = {
+  'n_clusters': n_clusters,
+  'cluster_mapping': new_cluster_mapping,
+  'parameter_ranges': info_dict['parameter_ranges'],
+  'max_cluster_size': np.max([x for x in cluster_size.values()]),
+  }
+
+f = open('bootstrapped_armman_params_small_variance_cluster_size.pickle', 'wb')
+pickle.dump(new_info_dict, f)
+import pdb, sys
+pdb.set_trace()
+sys.exit(0)
+
+#########################
+
 # enforce all clusters to be of the same size
 orig_n_indiv = len(info_dict['cluster_mapping'])
 cluster_size = orig_n_indiv // n_clusters
