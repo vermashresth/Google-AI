@@ -25,6 +25,8 @@ from sklearn.cluster import KMeans, OPTICS, SpectralClustering
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import mean_squared_error
+from sklearn import preprocessing
+
 
 from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
 from tensorflow.keras.models import load_model
@@ -62,13 +64,21 @@ CONFIG = {
     "clusters": int(sys.argv[1]),
     "transitions": "weekly",
     "clustering": sys.argv[2],
-    "pilot_start_date": sys.argv[3]
+    "pilot_start_date": sys.argv[3],
+    #REVIEW: Adding New mapping config params
+    "mapping_method": 'FO', # FO: Feature Only, WO: Warmup Only, FW: Feature+Warmup
+    "train_warmup_end_date": 9, #TODO: Date format
+    "test_warmup_end_date": 9,
+    'warmup_feat_cols': ['P(L, N, L)', 'P(H, N, L)']
 }
 
 if CONFIG['transitions'] == 'weekly':
     transitions = pd.read_csv("may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")
 else:
     transitions = pd.read_csv("may_data/RMAB_one_month/transitions_SI_single_group.csv")
+
+#TODO: Add path to test transitions
+test_transitions = pd.read_csv('')
 
 def kmeans_missing(X, n_clusters, max_iter=10):
     n_clusters = CONFIG['clusters']
@@ -108,40 +118,6 @@ def kmeans_missing(X, n_clusters, max_iter=10):
 
     return labels, centroids, X_hat, cls, len(set(labels)), i
 
-def get_static_feature_clusters(train_beneficiaries, train_transitions, features_dataset, n_clusters):
-    cols = [
-        "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
-    ]
-
-    user_ids, dynamic_xs, gest_ages, static_xs, ngo_hosp_ids, labels = features_dataset
-    
-    train_ids = train_beneficiaries['user_id']
-    idxes = [np.where(user_ids == x)[0][0] for x in train_ids]
-    train_static_features = static_xs[idxes]
-    train_static_features = train_static_features[:, : -8]
-
-    # test_ids = test_beneficiaries['user_id']
-    # idxes = [np.where(user_ids == x)[0][0] for x in test_ids]
-    # test_static_features = static_xs[idxes]
-    # test_static_features = test_static_features[:, : -8]
-
-    train_labels, centroids, _, cls, num_clusters, max_iters = kmeans_missing(train_static_features, n_clusters, max_iter=100)
-    train_beneficiaries['cluster'] = train_labels
-    # test_beneficiaries['cluster'] = cls.predict(test_static_features)
-
-    cluster_transition_probabilities = pd.DataFrame(columns=['cluster', 'count'] + cols)
-
-    for i in range(n_clusters):
-        cluster_beneficiaries = train_beneficiaries[train_beneficiaries['cluster'] == i]
-        cluster_b_user_ids = cluster_beneficiaries['user_id']
-        probs, _ = get_transition_probabilities(cluster_b_user_ids, train_transitions, min_support=3)
-        probs['cluster'] = i
-        probs['count'] = len(cluster_b_user_ids)
-        cluster_transition_probabilities = cluster_transition_probabilities.append(probs, ignore_index=True)
-
-    # ipdb.set_trace()
-
-    return cluster_transition_probabilities, cls
 
 def get_individual_transition_clusters(train_beneficiaries, train_transitions, features_dataset, n_clusters):
     cols = [
@@ -159,7 +135,13 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
     # idxes = [np.where(user_ids == x)[0][0] for x in test_ids]
     # test_static_features = static_xs[idxes]
     # test_static_features = test_static_features[:, : -8]
-    all_transition_probabilities = get_all_transition_probabilities(train_beneficiaries, train_transitions)
+
+    # REVIEW: Added Code to split all transitions into warmup and post warmup transition
+    warmup_train_transitions = train_transitions[train_transitions['start_date']<CONFIG['train_warmup_end_date']]
+    train_transitions = train_transitions[train_transitions['start_date']>=CONFIG['train_warmup_end_date']]
+    
+    all_transition_probabilities, _ = get_all_transition_probabilities(train_beneficiaries, train_transitions)
+    all_warmup_transition_probabilities, warmup_sup = get_all_transition_probabilities(train_beneficiaries, warmup_train_transitions)
     pass_to_kmeans_cols = ['P(L, N, L)', 'P(H, N, L)']
 
     train_labels, centroids, _, cls, num_clusters, max_iters = kmeans_missing(all_transition_probabilities[pass_to_kmeans_cols], n_clusters, max_iter=100)
@@ -169,7 +151,25 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
     # test_beneficiaries['cluster'] = cls.predict(test_static_features)
 
     dt_clf = RandomForestClassifier(n_estimators=200, criterion="entropy", max_depth=30, n_jobs=-1, random_state=124)
-    dt_clf.fit(train_static_features, train_labels)
+    # REVIEW: Added Code for mapping methods
+    if CONFIG['mapping_method']=='FO':
+        scaler = preprocessing.StandardScaler().fit(train_static_features)
+        mapping_X = scaler.transform(train_static_features)
+        dt_clf.fit(mapping_X, train_labels)
+    elif CONFIG['mapping_method'] == 'WO':
+        warmup_feats = np.concatenate([warmup_sup[CONFIG['warmup_feat_cols']].values,
+                                       all_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+        scaler = preprocessing.StandardScaler().fit(warmup_feats)
+        mapping_X = scaler.transform(warmup_feats)
+        dt_clf.fit(mapping_X, train_labels)
+    elif CONFIG['mapping_method'] == 'FW':
+        all_feats = np.concatenate([train_static_features, warmup_sup[CONFIG['warmup_feat_cols']].values,
+                                       all_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+        scaler = preprocessing.StandardScaler().fit(all_feats)
+        mapping_X = scaler.transform(all_feats)
+        dt_clf.fit(mapping_X, train_labels)
+    else:
+        raise NotImplementedError
 
     cluster_transition_probabilities = pd.DataFrame(columns=['cluster', 'count'] + cols)
 
@@ -182,8 +182,9 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
         cluster_transition_probabilities = cluster_transition_probabilities.append(probs, ignore_index=True)
 
     # ipdb.set_trace()
+    # TODO: Write unit test to verify alignment of features, transitions, predictions on same user ids
 
-    return cluster_transition_probabilities, dt_clf, train_beneficiaries
+    return cluster_transition_probabilities, dt_clf, scaler, train_beneficiaries
 
 def get_transition_probabilities(beneficiaries, transitions, min_support=3):
     transitions = transitions[transitions['user_id'].isin(beneficiaries)]
@@ -245,78 +246,18 @@ def get_all_transition_probabilities(train_beneficiaries, transitions):
         "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
     ]
     transition_probabilities = pd.DataFrame(columns = ['user_id'] + cols)
+    transition_sup = pd.DataFrame(columns = ['user_id'] + cols)
     user_ids = train_beneficiaries['user_id']
 
     for user_id in user_ids:
-        probs, _ = get_transition_probabilities([user_id], transitions, min_support=1)
+        probs, sup = get_transition_probabilities([user_id], transitions, min_support=1)
         probs['user_id'] = user_id
-
+        sup['user_id'] = user_id
         transition_probabilities = transition_probabilities.append(probs, ignore_index=True)
+        transition_sup = transition_sup.append(sup, ignore_index=True)
 
-    return transition_probabilities
+    return transition_probabilities, transition_sup
 
-def get_group_transition_probabilities(train_beneficiaries, transitions, beneficiary_data):
-    features = ["education", "phone_owner", "income_bracket", "age"]
-    cols = [
-        "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
-    ]
-    education_s = [[7], [1], [2], [3], [4], [5], [6]]
-    phone_owner_s = ["husband", "woman", "family"]
-    income_bracket_s = [['5000-10000', '0-5000'], ['10000-15000', '15000-20000'], ['30000 and above'], ['25000-30000', '20000-25000']]
-    age_s = [(0, 19), (19, 24), (24, 29), (29, 36), (36, 100)]
-
-    transition_probabilities = pd.DataFrame(columns=features+cols)
-    for education_idx in range(len(education_s)):
-        for phone_owner_idx in range(len(phone_owner_s)):
-            for income_bracket_idx in range(len(income_bracket_s)):
-                for age_idx in range(len(age_s)):
-                    beneficiaries = beneficiary_data[
-                        (beneficiary_data['user_id'].isin(train_beneficiaries['user_id']))&
-                        (beneficiary_data['age']>=age_s[age_idx][0])&
-                        (beneficiary_data['age']<age_s[age_idx][1])&
-                        (beneficiary_data['education'].isin(education_s[education_idx]))&
-                        (beneficiary_data['phone_owner']==phone_owner_s[phone_owner_idx])&
-                        (beneficiary_data['income_bracket'].isin(income_bracket_s[income_bracket_idx]))
-                    ]["user_id"]
-                    probs, _ = get_transition_probabilities(beneficiaries, transitions)
-
-                    probs["education"] = education_idx
-                    probs["income_bracket"] = income_bracket_idx
-                    probs["phone_owner"] = phone_owner_idx
-                    probs["age"] = age_idx
-                    probs['count'] = beneficiaries.shape[0]
-
-                    transition_probabilities = transition_probabilities.append(probs, ignore_index=True)
-
-    return transition_probabilities
-
-def get_pooled_estimate(group_transition_probabilities, train_beneficiaries, transitions, beneficiary_data):
-    education_s = [[7], [1], [2], [3], [4], [5], [6]]
-    phone_owner_s = ["husband", "woman", "family"]
-    income_bracket_s = [['5000-10000', '0-5000'], ['10000-15000', '15000-20000'], ['30000 and above'], ['25000-30000', '20000-25000']]
-    age_s = [(0, 19), (19, 24), (24, 29), (29, 36), (36, 100)]
-
-    beneficiaries = []
-    for i in group_transition_probabilities.index:
-        education_idx = int(group_transition_probabilities.loc[i, "education"].item())
-        income_bracket_idx = int(group_transition_probabilities.loc[i, "income_bracket"].item())
-        phone_owner_idx = int(group_transition_probabilities.loc[i, "phone_owner"].item())
-        age_idx = int(group_transition_probabilities.loc[i, "age"].item())
-
-        group_beneficiaries = beneficiary_data[
-            (beneficiary_data['user_id'].isin(train_beneficiaries['user_id']))&
-            (beneficiary_data['age']>=age_s[age_idx][0])&
-            (beneficiary_data['age']<age_s[age_idx][1])&
-            (beneficiary_data['education'].isin(education_s[education_idx]))&
-            (beneficiary_data['phone_owner']==phone_owner_s[phone_owner_idx])&
-            (beneficiary_data['income_bracket'].isin(income_bracket_s[income_bracket_idx]))
-        ]["user_id"]
-        beneficiaries.append(group_beneficiaries)
-
-    beneficiaries = pd.concat(beneficiaries, axis=0)
-    probs, num_lst = get_transition_probabilities(beneficiaries, transitions)
-
-    return probs, num_lst
 
 def get_reward(state, action, m):
     if state[0] == "L":
@@ -328,104 +269,6 @@ def get_reward(state, action, m):
 
     return reward
 
-# def plan2(two_state_probs, sleeping_constraint = 'True'):
-
-#     aug_states = []
-#     for i in range(6):
-#         if i % 2 == 0:
-#             aug_states.append('L{}'.format(i // 2))
-#         else:
-#             aug_states.append('H{}'.format(i // 2))
-
-#     if sleeping_constraint:
-#         local_CONFIG = {
-#             'problem': {
-#                 "orig_states": ['L', 'H'],
-#                 "states": aug_states + ['L', 'H'],
-#                 "actions": ["N", "I"],
-#             },
-#             "time_step": 7,
-#             "gamma": 0.99,
-#         }
-#     else:
-#         local_CONFIG = {
-#             'problem': {
-#                 "orig_states": ['L', 'H'],
-#                 "states": ['L', 'H'],
-#                 "actions": ["N", "I"],
-#             },
-#             "time_step": 7,
-#             "gamma": 0.99,
-#         }
-
-#     v_values = np.zeros(len(local_CONFIG['problem']['states']))
-#     q_values = np.zeros((len(local_CONFIG['problem']['states']), len(local_CONFIG['problem']['actions'])))
-#     high_m_values = 1 * np.ones(len(local_CONFIG['problem']['states']))
-#     low_m_values = -1 * np.ones(len(local_CONFIG['problem']['states']))
-
-#     t_probs = np.zeros((len(local_CONFIG['problem']['states']), len(local_CONFIG['problem']['states']), len(local_CONFIG['problem']['actions'])))
-
-#     if sleeping_constraint:    
-#         t_probs[0 : 2, 2 : 4, 0] = two_state_probs[:, :, 0]
-#         t_probs[2 : 4, 4 : 6, 0] = two_state_probs[:, :, 0]
-#         t_probs[4 : 6, 6 : 8, 0] = two_state_probs[:, :, 0]
-#         t_probs[6 : 8, 6 : 8, 0] = two_state_probs[:, :, 0]
-
-#         t_probs[0 : 2, 2 : 4, 1] = two_state_probs[:, :, 0]
-#         t_probs[2 : 4, 4 : 6, 1] = two_state_probs[:, :, 0]
-#         t_probs[4 : 6, 6 : 8, 1] = two_state_probs[:, :, 0]
-#         t_probs[6 : 8, 0 : 2, 1] = two_state_probs[:, :, 1]
-#     else:
-#         t_probs = two_state_probs
-
-#     max_q_diff = np.inf
-#     prev_m_values, m_values = None, None
-#     while max_q_diff > 1e-5:
-#         prev_m_values = m_values
-#         m_values = (low_m_values + high_m_values) / 2
-#         if type(prev_m_values) != type(None) and abs(prev_m_values - m_values).max() < 1e-20:
-#             break
-#         max_q_diff = 0
-#         v_values = np.zeros((len(local_CONFIG['problem']['states'])))
-#         q_values = np.zeros((len(local_CONFIG['problem']['states']), len(local_CONFIG['problem']['actions'])))
-#         delta = np.inf
-#         while delta > 0.0001:
-#             delta = 0
-#             for i in range(t_probs.shape[0]):
-#                 v = v_values[i]
-#                 v_a = np.zeros((t_probs.shape[2],))
-#                 for k in range(v_a.shape[0]):
-#                     for j in range(t_probs.shape[1]):
-#                         v_a[k] += t_probs[i, j, k] * (get_reward(local_CONFIG['problem']['states'][i], local_CONFIG['problem']['actions'][k], m_values[i]) + local_CONFIG["gamma"] * v_values[j])
-
-#                 v_values[i] = np.max(v_a)
-#                 delta = max([delta, abs(v_values[i] - v)])
-
-#         state_idx = -1
-#         for state in range(q_values.shape[1]):
-#             for action in range(q_values.shape[2]):
-#                 for next_state in range(q_values.shape[1]):
-#                     q_values[state, action] += t_probs[state, next_state, action] * (get_reward(local_CONFIG['problem']['states'][state], local_CONFIG['problem']['actions'][action], m_values[state]) + local_CONFIG["gamma"] * v_values[next_state])
-#             # print(state, q_values[cluster, state, 0], q_values[cluster, state, 1])
-
-#         for state in range(q_values.shape[1]):
-#             if abs(q_values[state, 1] - q_values[state, 0]) > max_q_diff:
-#                 state_idx = state
-#                 max_q_diff = abs(q_values[state, 1] - q_values[state, 0])
-
-#         # print(q_values)
-#         # print(low_m_values, high_m_values)
-#         if max_q_diff > 1e-5 and q_values[state_idx, 0] < q_values[state_idx, 1]:
-#             low_m_values[state_idx] = m_values[state_idx]
-#         elif max_q_diff > 1e-5 and q_values[state_idx, 0] > q_values[state_idx, 1]:
-#             high_m_values[state_idx] = m_values[state_idx]
-
-#         # print(low_m_values, high_m_values, state_idx)
-#         # ipdb.set_trace()
-    
-#     m_values = (low_m_values + high_m_values) / 2
-
-#     return q_values, m_values
 
 def plan(transition_probabilities, CONFIG):
 
@@ -507,82 +350,7 @@ def plan(transition_probabilities, CONFIG):
 
     return q_values, m_values
 
-def count_overlaps(test_beneficiaries):
-    call_beneficiaries = test_beneficiaries[test_beneficiaries['Group']=="Google-AI-Calls"]
-    call_succ_beneficiaries = test_beneficiaries[
-        (test_beneficiaries['Group']=="Google-AI-Calls")&
-        (test_beneficiaries['Intervention Status']=="Successful")
-    ]
-    control_beneficiaries = test_beneficiaries[test_beneficiaries['Group']=="Google-AI-Control"]
 
-    good_call_response = test_beneficiaries[
-        (test_beneficiaries['user_id'].isin(call_beneficiaries['user_id']))&
-        (test_beneficiaries['Post-intervention Day: E2C Ratio']>=0.5)
-    ]['user_id']
-
-    good_succ_call_response = test_beneficiaries[
-        (test_beneficiaries['user_id'].isin(call_succ_beneficiaries['user_id']))&
-        (test_beneficiaries['Post-intervention Day: E2C Ratio']>=0.5)
-    ]['user_id']
-
-    good_control_response = test_beneficiaries[
-        (test_beneficiaries['user_id'].isin(control_beneficiaries['user_id']))&
-        (test_beneficiaries['Post-intervention Day: E2C Ratio']>=0.5)
-    ]['user_id']
-
-    print([call_beneficiaries.shape[0], call_succ_beneficiaries.shape[0], control_beneficiaries.shape[0]])
-
-    notes = np.array([
-        [good_call_response.shape[0], 
-        good_succ_call_response.shape[0],
-        good_control_response.shape[0]]
-    ])
-
-    results = []
-    for k in [100, 200]:
-        top_k_call_beneficiaries = call_beneficiaries.iloc[:k, :]
-        top_k_good_call_beneficiaries = top_k_call_beneficiaries[top_k_call_beneficiaries['user_id'].isin(good_call_response)]
-
-        top_k_succ_call_beneficiaries = call_succ_beneficiaries.iloc[:k, :]
-        top_k_good_succ_call_beneficiaries = top_k_succ_call_beneficiaries[top_k_succ_call_beneficiaries['user_id'].isin(good_succ_call_response)]
-
-        top_k_control_beneficiaries = control_beneficiaries.iloc[:k, :]
-        top_k_good_control_beneficiaries = top_k_control_beneficiaries[top_k_control_beneficiaries['user_id'].isin(good_control_response)]
-
-        results.append([
-            top_k_good_call_beneficiaries.shape[0]/k, 
-            top_k_good_succ_call_beneficiaries.shape[0]/k,
-            top_k_good_control_beneficiaries.shape[0]/k
-        ])
-
-    return np.array(results), notes
-
-def run_experiment(train_beneficiaries, train_transitions, test_beneficiaries, call_data, CONFIG, features_dataset):
-    cluster_transition_probabilities, test_beneficiaries = get_static_feature_clusters(train_beneficiaries, train_transitions, test_beneficiaries, features_dataset, CONFIG['clusters'])
-    cluster_transition_probabilities.to_csv('outputs/weekly_cluster_transition_probabilities_{}.csv'.format(CONFIG['clusters']))
-    q_values, m_values = plan(cluster_transition_probabilities, CONFIG)
-
-    print('-'*60)
-    print('M Values: {}'.format(m_values))
-    print('-'*60)
-
-    print('-'*60)
-    print('Q Values: {}'.format(q_values))
-    print('-'*60)
-
-    for i in tqdm(test_beneficiaries.index):
-        user_id = test_beneficiaries.loc[i, "user_id"]
-        state = int(test_beneficiaries.loc[i, "state"])
-        cluster = int(test_beneficiaries.loc[i, 'cluster'])
-
-        # test_beneficiaries.loc[i, "Whittle Index"] = q_values[cluster, state, 1] - q_values[cluster, state, 0]
-        test_beneficiaries.loc[i, "Whittle Index"] = m_values[cluster, state]
-
-    test_beneficiaries = test_beneficiaries.sort_values(by="Whittle Index", ascending=False)
-    test_beneficiaries.to_csv('outputs/weekly_test_set_{}.csv'.format(CONFIG['clusters']))
-    results, notes = count_overlaps(test_beneficiaries)
-
-    return results, notes
 
 def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, pilot_data, beneficiary_data):
     pilot_beneficiary_data, pilot_call_data = load_data(pilot_data)
@@ -617,15 +385,15 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         'Recall': Recall
     }
 
-    model = load_model(os.path.join("models", 'lstm_model_final', "model"), custom_objects=dependencies)
-    output_probs = model.predict(x=[pilot_static_xs, pilot_dynamic_xs, pilot_hosp_id, pilot_gest_age])
-    out_lstm_labels = (output_probs >= 0.5).astype(np.int)
-    low_eng_idxes = np.where(out_lstm_labels == 1)[0]
-    low_eng_user_ids = np.array(pilot_user_ids)[low_eng_idxes]
+    # model = load_model(os.path.join("models", 'lstm_model_final', "model"), custom_objects=dependencies)
+    # output_probs = model.predict(x=[pilot_static_xs, pilot_dynamic_xs, pilot_hosp_id, pilot_gest_age])
+    # out_lstm_labels = (output_probs >= 0.5).astype(np.int)
+    # low_eng_idxes = np.where(out_lstm_labels == 1)[0]
+    # low_eng_user_ids = np.array(pilot_user_ids)[low_eng_idxes]
     pilot_static_features = np.array(pilot_static_xs, dtype=np.float)
     pilot_static_features = pilot_static_features[:, : -8]
 
-    cluster_transition_probabilities, cls, train_beneficiaries = get_individual_transition_clusters(all_beneficiaries, transitions, features_dataset, CONFIG['clusters'])
+    cluster_transition_probabilities, cls, scaler, train_beneficiaries = get_individual_transition_clusters(all_beneficiaries, transitions, features_dataset, CONFIG['clusters'])
     cols = [
         "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
     ]
@@ -694,14 +462,14 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     
     print(total_mse, total_count, total_mse / total_count)
     # cluster_transition_probabilities.to_csv('outputs/individual_clustering/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
-    exit()
+    # exit()
 
     ground_truth = np.array(ground_truth)
     with open('gt_beneficiary_probs.pkl', 'wb') as fr:
         pickle.dump(ground_truth, fr)
     fr.close()
 
-    ipdb.set_trace()
+    # ipdb.set_trace()
     # cluster_transition_probabilities['P(L] = cluster_transition_probabilities.fillna(cluster_transition_probabilities.mean())
     q_values, m_values = plan(cluster_transition_probabilities, CONFIG)
 
@@ -713,7 +481,26 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     print('Q Values: {}'.format(q_values))
     print('-'*60)
 
-    pilot_cluster_predictions = cls.predict(pilot_static_features)
+    # REVIEW: Added code for predicting clusters using new mapping method
+    pilot_benef_df = pd.DataFrame()
+    pilot_benef_df['user_id']=pilot_user_ids
+
+    if CONFIG['mapping_method']=='FO':
+        pilot_cluster_predictions = cls.predict(scaler.transform(pilot_static_features))
+    elif CONFIG['mapping_method'] == 'WO':
+        test_warmup_transitions = test_transitions[test_transitions['start_date']<CONFIG["test_warmup_end_date"]]
+        test_warmup_transition_probabilities, test_warmup_sup = get_all_transition_probabilities(pilot_benef_df, test_warmup_transitions)
+        warmup_feats = np.concatenate([test_warmup_sup[CONFIG['warmup_feat_cols']].values,
+                                       test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+        pilot_cluster_predictions = cls.predict(scaler.transform(warmup_feats))
+    elif CONFIG['mapping_method'] == 'FW':
+        test_warmup_transitions = test_transitions[test_transitions['start_date']<CONFIG["test_warmup_end_date"]]
+        test_warmup_transition_probabilities, test_warmup_sup = get_all_transition_probabilities(pilot_benef_df, test_warmup_transitions)
+        all_feats = np.concatenate([pilot_static_features, test_warmup_sup[CONFIG['warmup_feat_cols']].values,
+                                       test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+        pilot_cluster_predictions = cls.predict(scaler.transform(all_feats))
+    else:
+        raise NotImplementedError
 
     whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'lstm_prediction': [], 'gold_e2c': [], 'gold_label': [], 'registration_date': [], 'current_E2C': []}
     for idx, puser_id in enumerate(pilot_user_ids):
@@ -756,10 +543,10 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
             whittle_indices['start_state'].append('NE')
         elif curr_state == 6:
             whittle_indices['start_state'].append('E')
-        if out_lstm_labels[idx] == 0:
-            whittle_indices['lstm_prediction'].append('high_engagement')
-        elif out_lstm_labels[idx] == 1:
-            whittle_indices['lstm_prediction'].append('low_engagement')
+        # if out_lstm_labels[idx] == 0:
+        #     whittle_indices['lstm_prediction'].append('high_engagement')
+        # elif out_lstm_labels[idx] == 1:
+        #     whittle_indices['lstm_prediction'].append('low_engagement')
         whittle_indices['gold_e2c'].append(pilot_gold_e2c[idx])
         if pilot_gold_labels[idx] == 0:
             whittle_indices['gold_label'].append('high_engagement')
@@ -789,20 +576,6 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     return
 
-def run_and_repeat(beneficiaries, transitions, call_data, CONFIG, features_dataset):
-    all_results, all_notes = [], []
-
-    for train_beneficiaries, test_beneficiaries in beneficiaries:
-        train_transitions = transitions[transitions['user_id'].isin(train_beneficiaries['user_id'])]
-        results, notes = run_experiment(train_beneficiaries, train_transitions, test_beneficiaries, call_data, CONFIG, features_dataset)
-
-        print(results)
-        print(notes)
-        
-        all_results.append(results)
-        all_notes.append(notes)
-
-    return np.mean(np.stack(all_results, axis=0), axis=0), np.mean(np.stack(all_notes, axis=0), axis=0)
 
 run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, 'feb16-mar15_data', beneficiary_data)
 
