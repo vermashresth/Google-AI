@@ -157,6 +157,7 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
         mapping_X = scaler.transform(train_static_features)
         dt_clf.fit(mapping_X, train_labels)
     elif CONFIG['mapping_method'] == 'WO':
+        # TODO: Maybe use cluster predict fn
         warmup_feats = np.concatenate([warmup_sup[CONFIG['warmup_feat_cols']].values,
                                        all_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
         scaler = preprocessing.StandardScaler().fit(warmup_feats)
