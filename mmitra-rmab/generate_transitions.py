@@ -99,15 +99,36 @@ out_dict = {'user_id': [], 'pre-action state': [], 'action': [], 'post-action st
 
 intervention_dict = {}
 df2 =  pd.read_csv(CONFIG["current_folder"]+'/interventions_data.csv')
+count_all = 0
+count = 0
+max_week = 0
+min_week = 99999
 for user_id in all_user_ids:
     interventions_per_user = df2[df2['beneficiary_id']==user_id]
     dates_interventions_per_user = interventions_per_user['intervention_date'].to_list()
     if len(dates_interventions_per_user)==0:
         continue
     else:
-        weeks_interventions_per_user = [date_to_week(x) for x in dates_interventions_per_user]
-        intervention_dict[user_id] = weeks_interventions_per_user
+        weeks_interventions_per_user = []
+        for x in dates_interventions_per_user:
+            week = date_to_week(x)
+            if (week == week) and (week is not None): # check for nan/None
+                weeks_interventions_per_user.append(week)
 
+        intervention_dict[user_id] = weeks_interventions_per_user
+        
+        if len(weeks_interventions_per_user)>0:
+            count+=1
+            count_all += len(weeks_interventions_per_user)
+            if min(weeks_interventions_per_user) < min_week:
+                min_week = min(weeks_interventions_per_user)
+            if max(weeks_interventions_per_user) > max_week:
+                max_week = max(weeks_interventions_per_user)
+
+print("Number of beneficiaries intervened: "+str(count))
+print("Number of total interventions: "+str(count_all))
+print("min_week: "+str(min_week))
+print("max_week: "+str(max_week))
 
 for user_id in tqdm(all_user_ids):
     curr_row = df[df['user_id'] == user_id]
@@ -119,6 +140,7 @@ for user_id in tqdm(all_user_ids):
 
     if user_id in intervention_dict:
         user_intervention_list = intervention_dict[user_id]
+        user_intervention_list.sort()
     else:
         user_intervention_list = []
 
