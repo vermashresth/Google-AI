@@ -82,6 +82,7 @@ def date_to_week(xdate):
             return None
         if str_to_date(xdate) >= str_to_date(week_to_sdate[i]):
             return "week"+str(i)
+        return None
 # input files
 df_exp = pd.read_csv(CONFIG["pilot_data"]+"/Experiment.csv")
 df_int =pd.read_csv(CONFIG["pilot_data"]+"/interventions_data.csv")
@@ -128,7 +129,7 @@ else:
     from training.dataset import _preprocess_call_data, preprocess_and_make_dataset
 
     from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
-    from tensorflow.keras.models import load_model
+
 
 from tensorflow.keras.models import load_model
 
@@ -189,7 +190,8 @@ for user_id in tqdm(all_user_ids):
         else:
             curr_state = 6
     
-        if out_dict['intervention_week'][-1]==out_dict['intervention_week'][-1]: #check for nan
+        if (out_dict['intervention_week'][-1]==out_dict['intervention_week'][-1]) and (out_dict['intervention_week'][-1] is not None): #check for nan
+            #print(out_dict['intervention_week'])
             if i > int(out_dict['intervention_week'][-1][4:]):
                 countc += past_days_connections
                 counte += past_days_engagements
