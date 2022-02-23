@@ -148,7 +148,7 @@ for user_id in tqdm(all_user_ids):
     for i in range(T-1):
         start_state = 'L' if engagements[i] > 0 else 'H'
         next_state = 'L' if engagements[i + 1] > 0 else 'H'
-        action = 'Intervention' if i in user_intervention_list else 'No Intervention'
+        action = 'Intervention' if (i+1) in user_intervention_list else 'No Intervention'
         out_dict['user_id'].append(user_id)
         out_dict['pre-action state'].append(start_state)
         out_dict['action'].append(action)
