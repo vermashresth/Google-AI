@@ -33,16 +33,12 @@ from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
 from tensorflow.keras.models import load_model
 from training.modelling.dataloader import get_train_val_test
 
-stats = pd.read_csv("may_data/beneficiary_stats_v5.csv")
-beneficiary_data = pd.read_csv("may_data/beneficiary/AIRegistration-20200501-20200731.csv")
-b_data, call_data = load_data("may_data")
+beneficiary_data = pd.read_csv("feb16-mar15_data/beneficiary/ai_registration-20210216-20210315.csv")
+b_data, call_data = load_data("feb16-mar15_data")
 call_data = _preprocess_call_data(call_data)
-all_beneficiaries = stats[stats['Group'].isin(["Google-AI-Control", "Google-AI-Calls"])]
+all_beneficiaries = list(beneficiary_data.user_id)
 
-# features_dataset = preprocess_and_make_dataset(b_data, call_data)
-with open('may_data/features_dataset.pkl', 'rb') as fw:
-    features_dataset = pickle.load(fw)
-fw.close()
+features_dataset = preprocess_and_make_dataset(b_data, call_data)
 # exit()
 
 # beneficiary_splits = load_obj("may_data/RMAB_one_month/weekly_beneficiary_splits_single_group.pkl")
