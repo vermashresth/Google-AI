@@ -64,9 +64,9 @@ date_lists_april = ['2021-02-22', '2021-03-01', '2021-03-08', '2021-03-15', '202
 date_lists = {"jan_data": date_lists_jan, "feb16-mar15_data":date_lists_april}
 CONFIG = {
     'pilot_data': sys.argv[1],
-    'current_week': int(sys.argv[2]),
-    'pilot_dates' : date_lists[CONFIG["pilot_data"]]
+    'current_week': int(sys.argv[2])
     }
+CONFIG['pilot_dates'] = date_lists[CONFIG["pilot_data"]]
 week_to_sdate = week_to_sdate_dicts[CONFIG["pilot_data"]]
 
 def str_to_date(str_date):
@@ -116,18 +116,30 @@ import ipdb
 import pickle
 from tqdm import tqdm
 import sys
-from training_new.utils import load_obj, save_obj
-from training_new.data import load_data
-from training_new.dataset import _preprocess_call_data, preprocess_and_make_dataset
+if CONFIG['pilot_data']=='jan_data':
+    from training_new.utils import load_obj, save_obj
+    from training_new.data import load_data
+    from training_new.dataset import _preprocess_call_data, preprocess_and_make_dataset
 
-from training_new.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
+    from training_new.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
+else:
+    from training.utils import load_obj, save_obj
+    from training.data import load_data
+    from training.dataset import _preprocess_call_data, preprocess_and_make_dataset
+
+    from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
+    from tensorflow.keras.models import load_model
+
 from tensorflow.keras.models import load_model
 
 
 CONFIG["read_sql"] = 0
 print(df_exp)
 
-pilot_beneficiary_data, pilot_call_data = load_data(CONFIG)
+if CONFIG['pilot_data']=='jan_data':
+    pilot_beneficiary_data, pilot_call_data = load_data(CONFIG)
+else:
+    pilot_beneficiary_data, pilot_call_data = load_data(CONFIG["pilot_data"])
 pilot_call_data = _preprocess_call_data(pilot_call_data)
 
 
@@ -189,8 +201,3 @@ for user_id in tqdm(all_user_ids):
 
 df = pd.DataFrame(out_dict)
 df.to_csv(CONFIG["pilot_data"]+'/all_analysis_week_{}.csv'.format(CONFIG['current_week']))
-
-
-
-
-
