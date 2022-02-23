@@ -462,7 +462,8 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         cluster_transition_probabilities.loc[cluster_transition_probabilities['cluster'] == user_cluster, 'mean_squared_error'] = cluster_transition_probabilities[cluster_transition_probabilities['cluster'] == user_cluster]['mean_squared_error'].item() + mse_val
     
     print(total_mse, total_count, total_mse / total_count)
-    # cluster_transition_probabilities.to_csv('outputs/individual_clustering/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
+    # REVIEW: Saving train cluster transition probabilities
+    cluster_transition_probabilities.to_csv('outputs/new_mapping/{}_{}_transition_probabilities_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
     # exit()
 
     ground_truth = np.array(ground_truth)
@@ -472,15 +473,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     # ipdb.set_trace()
     # cluster_transition_probabilities['P(L] = cluster_transition_probabilities.fillna(cluster_transition_probabilities.mean())
-    q_values, m_values = plan(cluster_transition_probabilities, CONFIG)
 
-    print('-'*60)
-    print('M Values: {}'.format(m_values))
-    print('-'*60)
-
-    print('-'*60)
-    print('Q Values: {}'.format(q_values))
-    print('-'*60)
 
     # REVIEW: Added code for predicting clusters using new mapping method
     pilot_benef_df = pd.DataFrame()
@@ -502,6 +495,26 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         pilot_cluster_predictions = cls.predict(scaler.transform(all_feats))
     else:
         raise NotImplementedError
+    
+    # REVIEW: Save pilot predictions and GT
+    pilot_benef_df['cluster'] = pilot_cluster_predictions
+    pilot_benef_df = pd.merge(pilot_benef_df, cluster_transition_probabilities, on='cluster', how='left')
+    pilot_benef_df.to_csv('outputs/new_mapping/pilot_predicted_prob.csv')
+    test_post_warmup_transitions = test_transitions[test_transitions['start_date']>=CONFIG["test_warmup_end_date"]]
+    test_post_warmup_transition_probabilities, test_post_warmup_sup = get_all_transition_probabilities(pilot_benef_df, test_post_warmup_transitions)
+    test_post_warmup_transition_probabilities.to_csv('outputs/new_mapping/pilot_gt_prob.csv')
+
+    exit()
+
+    q_values, m_values = plan(cluster_transition_probabilities, CONFIG)
+
+    print('-'*60)
+    print('M Values: {}'.format(m_values))
+    print('-'*60)
+
+    print('-'*60)
+    print('Q Values: {}'.format(q_values))
+    print('-'*60)
 
     whittle_indices = {'user_id': [], 'whittle_index': [], 'cluster': [], 'start_state': [], 'lstm_prediction': [], 'gold_e2c': [], 'gold_label': [], 'registration_date': [], 'current_E2C': []}
     for idx, puser_id in enumerate(pilot_user_ids):
@@ -571,7 +584,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     df = pd.DataFrame(whittle_indices)
     df = df.sort_values('whittle_index', ascending=False)
-    df.to_csv('outputs/individual_clustering/checking_{}_{}_pilot_stats_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
+    df.to_csv('outputs/new_mapping/checking_{}_{}_pilot_stats_{}.csv'.format(CONFIG['transitions'], CONFIG['clustering'], CONFIG['clusters']))
 
     # ipdb.set_trace()
 
