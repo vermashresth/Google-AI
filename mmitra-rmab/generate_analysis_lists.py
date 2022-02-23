@@ -82,7 +82,7 @@ def date_to_week(xdate):
             return None
         if str_to_date(xdate) >= str_to_date(week_to_sdate[i]):
             return "week"+str(i)
-        return None
+    return None
 # input files
 df_exp = pd.read_csv(CONFIG["pilot_data"]+"/Experiment.csv")
 df_int =pd.read_csv(CONFIG["pilot_data"]+"/interventions_data.csv")
