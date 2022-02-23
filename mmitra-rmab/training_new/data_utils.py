@@ -98,13 +98,15 @@ def wrap_date_to_int(fmt: str):
 def wrap_time_to_int(fmt: str):
     return lambda x: time_to_int(x, fmt)
 
+def enroll_delivery_status_to_int(inp: str):
+    return 1 if inp == 'D' else 0
 
 def education_to_int(inp: int) -> int:
     """
     Educaton level to int. If 7(illiterate) convert to 0
     """
     try:
-        return 0 if inp == 7 else int(inp)
+        return int(inp)#0 if int(inp) == 7 else int(inp)
     except:
         logging.warning(f"{inp} is not a valid education. Outputting NA.")
         return pd.NaT
@@ -114,12 +116,12 @@ def phowner_to_int(inp: str) -> int:
     """
     Convert phone_owner to int
     """
-    vals = {"woman": 0, "husband": 1, "family": 2}
+    vals = {"woman": 0, "husband": 1, "family": 2, 'women': 0}
     if inp.lower().strip() in vals.keys():
         return vals[inp.lower().strip()]
     else:
-        logging.warning(f"{inp} is not a valid phone owner. Outputting NA.")
-        return pd.NaT
+        #logging.warning(f"{inp} is not a valid phone owner. Outputting NA.")
+        return 2 #pd.NaT
 
 
 def ch_type_to_int(inp: str) -> int:
@@ -138,6 +140,7 @@ def income_bracket_to_int(inp: str) -> int:
     """
     Convert income_bracket to int
     """
+    return int(inp) - 1
     vals = {
         "0-5000": 0,
         "5000-10000": 1,

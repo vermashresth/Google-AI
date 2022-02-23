@@ -13,8 +13,8 @@ from pandas.api.types import CategoricalDtype
 from .data_utils import calls_so_far, date_to_month, pad_sequences
 from .utils import load_obj, save_obj
 
-ngo_hosp_dict = load_obj(os.path.join("training", "res", "ngo_hosp_dict.pkl"))
-gest_dict = load_obj(os.path.join("training", "res", "gest_dict.pkl"))
+ngo_hosp_dict = load_obj(os.path.join("training_new", "res", "ngo_hosp_dict.pkl"))
+gest_dict = load_obj(os.path.join("training_new", "res", "gest_dict.pkl"))
 
 
 def _days_to_first_call(row):
@@ -60,7 +60,13 @@ def _preprocess_beneficiary_data(data, call_data):
     for col in valid_ranges.keys():
         min_val, max_val, replace_val = valid_ranges[col]
         data = data.round({col: 0})
+        print(col)
+        col_vals = set(data[col].to_list())
+        print(col_vals)
+        print(data.loc[~((min_val <= data[col]) & (data[col] <= max_val)), col])
+        print(data.loc[~((min_val <= data[col]) & (data[col] <= max_val)), col].shape)
         data.loc[~((min_val <= data[col]) & (data[col] <= max_val)), col] = replace_val
+        
 
     # replace invalid values of each categorical column
     valid_categories = {
@@ -69,15 +75,18 @@ def _preprocess_beneficiary_data(data, call_data):
         "language": ([2, 3, 4, 5], 2),
         "ChannelType": ([0, 1, 2], 0),
         "ngo_hosp_id": (ngo_hosp_dict.keys(), 4),
-        "education": ([1, 2, 3, 4, 5, 6, 7], 3),
+        "education": ([7, 1, 2, 3, 4, 5, 6], 3),
         "phone_owner": ([0, 1, 2], 2),
         "income_bracket": ([-1, 0, 1, 2, 3, 4, 5, 6], -1),
     }
     for col in valid_categories.keys():
         valid_vals, replace_val = valid_categories[col]
+        print(col)
+        print(data.loc[~data[col].isin(valid_vals), col])
+        print(data.loc[~data[col].isin(valid_vals), col].shape)
         data.loc[~data[col].isin(valid_vals), col] = replace_val
         data[col] = data[col].astype(CategoricalDtype(categories=valid_vals))
-
+    #exit()
     # binning age into five groups
     bins = [14, 20, 25, 30, 35, 51]
     data.loc[:, "age"] = pd.cut(data["age"], bins=bins, labels=False)
@@ -152,10 +161,11 @@ def _preprocess_beneficiary_data(data, call_data):
 
 
 def _preprocess_call_data(data):
-
+    print(data.shape)
+    print(data)
     # dropping rows will null values (ideally shouldn't drop any)
     data = data.dropna()
-
+    print(data.shape)
     # not checking duration as it is already checked during cleaning
     data["duration"] = data["duration"].astype('uint8')
 
@@ -170,27 +180,27 @@ def _preprocess_call_data(data):
     data = data[data["startdate"] >= 0]
     data["startdate"] = data["startdate"].astype('int32')
 
-    # checking if all gest_ages are known
-    for col in ["gest_stage", "gest_week_day", "gest_index"]:
-        data[col] = data[col].astype("int").astype("str")
+    # # checking if all gest_ages are known
+    # for col in ["gest_stage", "gest_week_day", "gest_index"]:
+    #     data[col] = data[col].astype("int").astype("str")
 
-    unique_gest_ages = data[["gest_stage", "gest_week_day", "gest_index"]].drop_duplicates()
-    unique_gest_ages["gest_age"] = unique_gest_ages[["gest_stage", "gest_week_day", "gest_index"]].agg(
-        ",".join, axis=1
-    )
-    data = pd.merge(data, unique_gest_ages, on=["gest_stage", "gest_week_day", "gest_index"], how="left", sort=False)
-    for col in ["gest_stage", "gest_week_day", "gest_index"]:
-        data[col] = data[col].astype("int16")
+    # unique_gest_ages = data[["gest_stage", "gest_week_day", "gest_index"]].drop_duplicates()
+    # unique_gest_ages["gest_age"] = unique_gest_ages[["gest_stage", "gest_week_day", "gest_index"]].agg(
+    #     ",".join, axis=1
+    # )
+    # data = pd.merge(data, unique_gest_ages, on=["gest_stage", "gest_week_day", "gest_index"], how="left", sort=False)
+    # for col in ["gest_stage", "gest_week_day", "gest_index"]:
+    #     data[col] = data[col].astype("int16")
 
-    # use only seen gest_ages
-    data = data[data["gest_age"].isin(gest_dict.keys())]
-    data = data.drop(columns=["gest_age"])
+    # # use only seen gest_ages
+    # data = data[data["gest_age"].isin(gest_dict.keys())]
+    # data = data.drop(columns=["gest_age"])
 
     return data
 
 
 def _build(beneficiaries, beneficiary_data, call_data, config):
-    user_ids, static_xs, ngo_hosp_ids, dynamic_xs, gest_ages, labels = [], [], [], [], [], []
+    user_ids, static_xs, ngo_hosp_ids, dynamic_xs, labels = [], [], [], [], [] #gest_ages, labels = [], [], [], [], [], []
 
     order = [
         "callStatus",
@@ -198,9 +208,9 @@ def _build(beneficiaries, beneficiary_data, call_data, config):
         "duration",
         "daysfrom",
         "month",
-        "gest_stage",
-        "gest_week_day",
-        "gest_index",
+        # "gest_stage",
+        # "gest_week_day",
+        # "gest_index",
     ]
 
     for i in tqdm(range(beneficiaries.shape[0])):
@@ -293,15 +303,15 @@ def _build(beneficiaries, beneficiary_data, call_data, config):
         # saving the call features as dynamic inputs
         dynamic_xs.append(input_sequence[:, :5])
 
-        # saving the media id (gestation age) for each call
-        gest_ages.append(
-            np.array(
-                [
-                    gest_dict[",".join([str(int(x)) for x in gest_details])]
-                    for gest_details in input_sequence[:, 5:]
-                ]
-            )
-        )
+        # # saving the media id (gestation age) for each call
+        # gest_ages.append(
+        #     np.array(
+        #         [
+        #             gest_dict[",".join([str(int(x)) for x in gest_details])]
+        #             for gest_details in input_sequence[:, 5:]
+        #         ]
+        #     )
+        # )
 
         output_attempts = output_sequence.shape[0]
         output_succ_attempts = output_sequence[output_sequence["Technical Status"]==1].shape[0]
@@ -313,7 +323,7 @@ def _build(beneficiaries, beneficiary_data, call_data, config):
     return (
         np.array(user_ids, dtype=np.int32),
         pad_sequences(dynamic_xs, n=config["input_calls_max"], dim=5),
-        pad_sequences(gest_ages, n=config["input_calls_max"], dim=1),
+        #pad_sequences(gest_ages, n=config["input_calls_max"], dim=1),
         np.array(static_xs, dtype=np.int16),
         np.array(ngo_hosp_ids, dtype=np.int16),
         np.array(labels, dtype=np.int16),
@@ -341,13 +351,13 @@ def _build_dataset(beneficiary_data, call_data):
     # calculating the number of days beneficiary is in the program
     beneficiaries.loc[:, "length"] = beneficiaries["end"] - beneficiaries["start"]
 
-    # filtering beneficiaries that do not meet minimum program length requirements
-    beneficiaries = beneficiaries[beneficiaries["length"] >= config["input_length"]]
+    # # filtering beneficiaries that do not meet minimum program length requirements
+    # beneficiaries = beneficiaries[beneficiaries["length"] >= config["input_length"]]
 
-    logging.info(
-        "%d beneficiaries have met %d-day program length requirement."
-        % (beneficiary_data.shape[0], config["input_length"])
-    )
+    # logging.info(
+    #     "%d beneficiaries have met %d-day program length requirement."
+    #     % (beneficiaries.shape[0], config["input_length"])
+    # )
 
     # dividing the beneficiary and call data into chunks to parallelize dataset creation
     number_of_cores = cpu_count()
@@ -363,7 +373,7 @@ def _build_dataset(beneficiary_data, call_data):
 
     # using multiprocessing to map processes to all available cores
     pool = Pool(number_of_cores)
-    user_ids, dynamic_xs, gest_ages, static_xs, ngo_hosp_ids, labels = zip(
+    user_ids, dynamic_xs, static_xs, ngo_hosp_ids, labels = zip(#gest_ages, static_xs, ngo_hosp_ids, labels = zip(
         *pool.starmap(_build, args)
     )
     pool.close()
@@ -372,7 +382,7 @@ def _build_dataset(beneficiary_data, call_data):
     # concatenating results of all processes
     user_ids = np.concatenate(user_ids, axis=0)
     dynamic_xs = np.concatenate(dynamic_xs, axis=0)
-    gest_ages = np.concatenate(gest_ages, axis=0)
+    #gest_ages = np.concatenate(gest_ages, axis=0)
     static_xs = np.concatenate(static_xs, axis=0)
     ngo_hosp_ids = np.concatenate(ngo_hosp_ids, axis=0)
     labels = np.concatenate(labels, axis=0)
@@ -394,7 +404,7 @@ def _build_dataset(beneficiary_data, call_data):
         % (beneficiary_data.shape[0], config["input_calls_thresh"])
     )
 
-    dataset = (user_ids, dynamic_xs, gest_ages, static_xs, ngo_hosp_ids, labels)
+    dataset = (user_ids, dynamic_xs, static_xs, ngo_hosp_ids, labels) #gest_ages, static_xs, ngo_hosp_ids, labels)
 
     return dataset
 
@@ -418,11 +428,13 @@ def preprocess_and_make_dataset(beneficiary_data, call_data):
     beneficiary_data = _preprocess_beneficiary_data(beneficiary_data, call_data)
 
     logging.info("Preprocessing beneficiary data completed.")
+    logging.info("Preprocessed beneficiary data shape: "+str(beneficiary_data.shape))
     logging.info("Preprocessing call data.")
 
     call_data = _preprocess_call_data(call_data)
 
     logging.info("Preprocessing call data completed.")
+    logging.info("Preprocessed call data shape: "+str(call_data.shape))
     logging.info("Building the dataset.")
 
     # Selecting beneficiaries with available data
