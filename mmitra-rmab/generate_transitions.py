@@ -146,15 +146,19 @@ for user_id in tqdm(all_user_ids):
 
     assert len(engagements) == T
     for i in range(T-1):
-        start_state = 'L' if engagements[i] > 0 else 'H'
-        next_state = 'L' if engagements[i + 1] > 0 else 'H'
-        action = 'Intervention' if (i+1) in user_intervention_list else 'No Intervention'
-        out_dict['user_id'].append(user_id)
-        out_dict['pre-action state'].append(start_state)
-        out_dict['action'].append(action)
-        out_dict['post-action state'].append(next_state)
-        out_dict['start_date'].append(week_to_sdate[i])
+        pilot_date_num = (pd.to_datetime(week_to_sdate[i], format="%Y-%m-%d") - pd.to_datetime("2018-01-01", format="%Y-%m-%d")).days
+        if pilot_date_num > curr_row['registration_date'].item():
+            start_state = 'L' if engagements[i] > 0 else 'H'
+            next_state = 'L' if engagements[i + 1] > 0 else 'H'
+            action = 'Intervention' if (i+1) in user_intervention_list else 'No Intervention'
+            out_dict['user_id'].append(user_id)
+            out_dict['pre-action state'].append(start_state)
+            out_dict['action'].append(action)
+            out_dict['post-action state'].append(next_state)
+            out_dict['start_date'].append(week_to_sdate[i])
 
+
+print('intervention_list: '+str(user_intervention_list))
 transitions_df = pd.DataFrame(out_dict)
 print(transitions_df.groupby('action').count())
 transitions_df.to_csv(CONFIG["current_folder"]+'/transitions.csv')
