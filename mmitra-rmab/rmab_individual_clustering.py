@@ -7,6 +7,7 @@ import seaborn as sns
 import tensorflow as tf
 import matplotlib.pyplot as plt
 from copy import deepcopy
+from functools import partial
 
 from datetime import datetime
 from pprint import pprint
@@ -71,6 +72,8 @@ CONFIG = {
     "test_warmup_end_date": 9,
     'warmup_feat_cols': ['P(L, N, L)', 'P(H, N, L)']
 }
+
+f = partial(pd.to_datetime, dayfirst=True)
 
 if CONFIG['transitions'] == 'weekly':
     transitions = pd.read_csv("may_data/RMAB_one_month/weekly_transitions_SI_single_group.csv")
@@ -137,8 +140,8 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
     # test_static_features = test_static_features[:, : -8]
 
     # REVIEW: Added Code to split all transitions into warmup and post warmup transition
-    warmup_train_transitions = train_transitions[train_transitions['start_date']<CONFIG['train_warmup_end_date']]
-    train_transitions = train_transitions[train_transitions['start_date']>=CONFIG['train_warmup_end_date']]
+    warmup_train_transitions = train_transitions[pd.to_datetime(train_transitions['start_date'])<f(CONFIG['train_warmup_end_date'])]
+    train_transitions = train_transitions[pd.to_datetime(train_transitions['start_date'])>=f(CONFIG['train_warmup_end_date'])]
     
     all_transition_probabilities, _ = get_all_transition_probabilities(train_beneficiaries, train_transitions)
     all_warmup_transition_probabilities, warmup_sup = get_all_transition_probabilities(train_beneficiaries, warmup_train_transitions)
@@ -482,13 +485,13 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     if CONFIG['mapping_method']=='FO':
         pilot_cluster_predictions = cls.predict(scaler.transform(pilot_static_features))
     elif CONFIG['mapping_method'] == 'WO':
-        test_warmup_transitions = test_transitions[test_transitions['start_date']<CONFIG["test_warmup_end_date"]]
+        test_warmup_transitions = test_transitions[pd.to_datetime(test_transitions['start_date'])<f(CONFIG["test_warmup_end_date"])]
         test_warmup_transition_probabilities, test_warmup_sup = get_all_transition_probabilities(pilot_benef_df, test_warmup_transitions)
         warmup_feats = np.concatenate([test_warmup_sup[CONFIG['warmup_feat_cols']].values,
                                        test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
         pilot_cluster_predictions = cls.predict(scaler.transform(warmup_feats))
     elif CONFIG['mapping_method'] == 'FW':
-        test_warmup_transitions = test_transitions[test_transitions['start_date']<CONFIG["test_warmup_end_date"]]
+        test_warmup_transitions = test_transitions[pd.to_datetime(test_transitions['start_date'])<f(CONFIG["test_warmup_end_date"])]
         test_warmup_transition_probabilities, test_warmup_sup = get_all_transition_probabilities(pilot_benef_df, test_warmup_transitions)
         all_feats = np.concatenate([pilot_static_features, test_warmup_sup[CONFIG['warmup_feat_cols']].values,
                                        test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
@@ -500,7 +503,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     pilot_benef_df['cluster'] = pilot_cluster_predictions
     pilot_benef_df = pd.merge(pilot_benef_df, cluster_transition_probabilities, on='cluster', how='left')
     pilot_benef_df.to_csv('outputs/new_mapping/pilot_predicted_prob.csv')
-    test_post_warmup_transitions = test_transitions[test_transitions['start_date']>=CONFIG["test_warmup_end_date"]]
+    test_post_warmup_transitions = test_transitions[pd.to_datetime(test_transitions['start_date'])>=f(CONFIG["test_warmup_end_date"])]
     test_post_warmup_transition_probabilities, test_post_warmup_sup = get_all_transition_probabilities(pilot_benef_df, test_post_warmup_transitions)
     test_post_warmup_transition_probabilities.to_csv('outputs/new_mapping/pilot_gt_prob.csv')
 
