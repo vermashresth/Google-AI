@@ -354,8 +354,8 @@ def plan(transition_probabilities, CONFIG):
 
 def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, pilot_data, beneficiary_data):
     CONFIG["read_sql"]=0
-    from training.data import load_data as load_data_new
-    from training.dataset import _preprocess_call_data as _preprocess_call_data_new, preprocess_and_make_dataset as preprocess_and_make_dataset_new
+    from training_new.data import load_data as load_data_new
+    from training_new.dataset import _preprocess_call_data as _preprocess_call_data_new, preprocess_and_make_dataset as preprocess_and_make_dataset_new
     pilot_beneficiary_data, pilot_call_data = load_data_new(CONFIG)
     inf_dataset = preprocess_and_make_dataset_new(pilot_beneficiary_data, pilot_call_data)
     pilot_call_data = _preprocess_call_data_new(pilot_call_data)
