@@ -353,10 +353,13 @@ def plan(transition_probabilities, CONFIG):
 
 
 def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, pilot_data, beneficiary_data):
-    pilot_beneficiary_data, pilot_call_data = load_data(pilot_data)
-    inf_dataset = preprocess_and_make_dataset(pilot_beneficiary_data, pilot_call_data)
-    pilot_call_data = _preprocess_call_data(pilot_call_data)
-    pilot_user_ids, pilot_dynamic_xs, pilot_gest_age, pilot_static_xs, pilot_hosp_id, pilot_labels = inf_dataset
+    CONFIG["read_sql"]=0
+    from training.data import load_data as load_data_new
+    from training.dataset import _preprocess_call_data as _preprocess_call_data_new, preprocess_and_make_dataset as preprocess_and_make_dataset
+    pilot_beneficiary_data, pilot_call_data = load_data_new(CONFIG)
+    inf_dataset = preprocess_and_make_dataset_new(pilot_beneficiary_data, pilot_call_data)
+    pilot_call_data = _preprocess_call_data_new(pilot_call_data)
+    pilot_user_ids, pilot_dynamic_xs, pilot_static_xs, pilot_hosp_id, pilot_labels = inf_dataset
     pilot_gold_e2c = pilot_labels[:, 3] / pilot_labels[:, 2]
     pilot_gold_e2c_processed = np.nan_to_num(pilot_gold_e2c)
     pilot_gold_labels = (pilot_gold_e2c_processed < 0.5) * 1.0
@@ -364,8 +367,8 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
 
     # ipdb.set_trace()
 
-    enroll_gest_age_mean = np.mean(inf_dataset[3][:, 0])
-    days_to_first_call_mean = np.mean(inf_dataset[3][:, 7])
+    enroll_gest_age_mean = np.mean(inf_dataset[2][:, 0])
+    days_to_first_call_mean = np.mean(inf_dataset[2][:, 6])
 
     # dynamic features preprocessing
     pilot_dynamic_xs = pilot_dynamic_xs.astype(np.float32)
@@ -376,7 +379,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     # static features preprocessing
     pilot_static_xs = pilot_static_xs.astype(np.float32)
     pilot_static_xs[:, 0] = (pilot_static_xs[:, 0] - enroll_gest_age_mean)
-    pilot_static_xs[:, 7] = (pilot_static_xs[:, 7] - days_to_first_call_mean)
+    pilot_static_xs[:, 6] = (pilot_static_xs[:, 6] - days_to_first_call_mean)
 
     dependencies = {
         'BinaryAccuracy': BinaryAccuracy,
