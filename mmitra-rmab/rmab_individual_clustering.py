@@ -33,10 +33,11 @@ from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
 from tensorflow.keras.models import load_model
 from training.modelling.dataloader import get_train_val_test
 
-beneficiary_data = pd.read_csv("feb16-mar15_data/beneficiary/ai_registration-20210216-20210315.csv")
+stats = pd.read_csv("feb16-mar15_data/weekly_kmeans_pilot_stats_40.csv")
+beneficiary_data = pd.read_csv("feb16-mar15_data/beneficiary/ai_registration-20210216-20210315.csv", sep='\t')
 b_data, call_data = load_data("feb16-mar15_data")
 call_data = _preprocess_call_data(call_data)
-all_beneficiaries = list(beneficiary_data.user_id)
+all_beneficiaries = stats
 
 features_dataset = preprocess_and_make_dataset(b_data, call_data)
 # exit()
@@ -58,16 +59,16 @@ CONFIG = {
     },
     "time_step": 7,
     "gamma": 0.99,
-    "clusters": int(sys.argv[1]),
+    "clusters": 20, #int(sys.argv[1]),
     "transitions": "weekly",
-    "clustering": sys.argv[2],
-    "pilot_start_date": sys.argv[3],
+    "clustering": 'kmeans', #sys.argv[2],
+    "pilot_start_date": '2022-01-17', #sys.argv[3],
     #REVIEW: Adding New mapping config params
     "mapping_method": 'FO', # FO: Feature Only, WO: Warmup Only, FW: Feature+Warmup
-    "train_warmup_start_date": 9 , #TODO: Date format
-    "test_warmup_start_date": 9,
-    "train_warmup_end_date": 9, #TODO: Date format
-    "test_warmup_end_date": 9,
+    "train_warmup_start_date": '2021-03-29' , #REVIEW
+    "test_warmup_start_date": '2021-12-20',
+    "train_warmup_end_date": '2021-04-19', 
+    "test_warmup_end_date":  '2022-01-10',
     'warmup_feat_cols': ['P(L, N, L)', 'P(H, N, L)']
 }
 
@@ -116,7 +117,7 @@ def kmeans_missing(X, n_clusters, max_iter=10):
     return labels, centroids, X_hat, cls, len(set(labels)), i
 
 
-def get_individual_transition_clusters(train_beneficiaries, train_transitions, features_dataset, n_clusters):
+def get_individual_transition_clusters(train_beneficiaries, train_transitions, features_dataset, n_clusters, mapping_method):
     cols = [
         "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
     ]
@@ -151,20 +152,20 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
 
     dt_clf = RandomForestClassifier(n_estimators=200, criterion="entropy", max_depth=30, n_jobs=-1, random_state=124)
     # REVIEW: Added Code for mapping methods
-    if CONFIG['mapping_method']=='FO':
+    if mapping_method=='FO':
         scaler = preprocessing.StandardScaler().fit(train_static_features)
         mapping_X = scaler.transform(train_static_features)
         dt_clf.fit(mapping_X, train_labels)
-    elif CONFIG['mapping_method'] == 'WO':
+    elif mapping_method == 'WO':
         # TODO: Maybe use cluster predict fn
         warmup_feats = np.concatenate([warmup_sup[CONFIG['warmup_feat_cols']].values,
-                                       all_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+                                       all_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].fillna(-1).values], axis=1)
         scaler = preprocessing.StandardScaler().fit(warmup_feats)
         mapping_X = scaler.transform(warmup_feats)
         dt_clf.fit(mapping_X, train_labels)
-    elif CONFIG['mapping_method'] == 'FW':
+    elif mapping_method == 'FW':
         all_feats = np.concatenate([train_static_features, warmup_sup[CONFIG['warmup_feat_cols']].values,
-                                       all_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+                                       all_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].fillna(-1).values], axis=1)
         scaler = preprocessing.StandardScaler().fit(all_feats)
         mapping_X = scaler.transform(all_feats)
         dt_clf.fit(mapping_X, train_labels)
@@ -354,6 +355,7 @@ def plan(transition_probabilities, CONFIG):
 
 def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_dataset, pilot_data, beneficiary_data):
     CONFIG["read_sql"]=0
+    CONFIG['pilot_data'] = 'jan_data'
     from training_new.data import load_data as load_data_new
     from training_new.dataset import _preprocess_call_data as _preprocess_call_data_new, preprocess_and_make_dataset as preprocess_and_make_dataset_new
     pilot_beneficiary_data, pilot_call_data = load_data_new(CONFIG)
@@ -396,7 +398,8 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     pilot_static_features = np.array(pilot_static_xs, dtype=np.float)
     pilot_static_features = pilot_static_features[:, : -8]
 
-    cluster_transition_probabilities, cls, scaler, train_beneficiaries = get_individual_transition_clusters(all_beneficiaries, transitions, features_dataset, CONFIG['clusters'])
+    cluster_transition_probabilities, cls, scaler, train_beneficiaries = get_individual_transition_clusters(all_beneficiaries, transitions, features_dataset,
+                                                                                                            CONFIG['clusters'], CONFIG['mapping_method'])
     cols = [
         "P(L, I, L)", "P(L, I, H)", "P(H, I, L)", "P(H, I, H)", "P(L, N, L)", "P(L, N, H)", "P(H, N, L)", "P(H, N, H)", 
     ]
@@ -418,7 +421,7 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         else:
             cluster_transition_probabilities[cols[i]] = 1 - cluster_transition_probabilities[cols[i - 1]]
 
-    ipdb.set_trace()
+    # ipdb.set_trace()
 
     train_b_ids = train_beneficiaries['user_id'].to_list()
     cluster_transition_probabilities['mean_squared_error'] = 0.0
@@ -491,11 +494,11 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
         pilot_cluster_predictions = cls.predict(scaler.transform(pilot_static_features))
     elif CONFIG['mapping_method'] == 'WO':
         warmup_feats = np.concatenate([test_warmup_sup[CONFIG['warmup_feat_cols']].values,
-                                       test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+                                       test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].fillna(-1).values], axis=1)
         pilot_cluster_predictions = cls.predict(scaler.transform(warmup_feats))
     elif CONFIG['mapping_method'] == 'FW':
         all_feats = np.concatenate([pilot_static_features, test_warmup_sup[CONFIG['warmup_feat_cols']].values,
-                                       test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].values], axis=1)
+                                       test_warmup_transition_probabilities[CONFIG['warmup_feat_cols']].fillna(-1).values], axis=1)
         pilot_cluster_predictions = cls.predict(scaler.transform(all_feats))
     else:
         raise NotImplementedError
@@ -503,10 +506,10 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     # REVIEW: Save pilot predictions and GT
     pilot_benef_df['cluster'] = pilot_cluster_predictions
     pilot_benef_df = pd.merge(pilot_benef_df, cluster_transition_probabilities, on='cluster', how='left')
-    pilot_benef_df.to_csv('outputs/new_mapping/pilot_predicted_prob.csv')
+    pilot_benef_df.to_csv(f'outputs/clusters_{CONFIG["clusters"]}_mapping_{CONFIG["mapping_method"]}_predicted_prob.csv')
     test_post_warmup_transitions = test_transitions[pd.to_datetime(test_transitions['start_date'])>f(CONFIG["test_warmup_end_date"])]
     test_post_warmup_transition_probabilities, test_post_warmup_sup = get_all_transition_probabilities(pilot_benef_df, test_post_warmup_transitions)
-    test_post_warmup_transition_probabilities.to_csv('outputs/new_mapping/pilot_gt_prob.csv')
+    test_post_warmup_transition_probabilities.to_csv(f'outputs/clusters_{CONFIG["clusters"]}_mapping_{CONFIG["mapping_method"]}_gt_prob.csv')
 
     exit()
 
