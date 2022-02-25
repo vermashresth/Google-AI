@@ -438,7 +438,7 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None, 
                 s_a = transitions_df[(transitions_df['s']==s) &
                                         (transitions_df['a']==a)
                                     ]
-                s_a_count = s_a.shape[0]
+                s_a_count = s_a.shape[0] # len(s_a)
                 for s_prime in range(n_states):
                     s_a_s_prime = s_a[(s_a['s_prime']==s_prime)
                                                 ]

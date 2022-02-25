@@ -4,6 +4,7 @@ import argparse
 import tqdm
 import time
 import sys
+import os
 import pickle
 import random
 sys.path.insert(0, "../")
@@ -67,12 +68,14 @@ if __name__ == '__main__':
         np.random.seed(seed)
         random.seed(seed)
         tf.random.set_seed(seed)
-    else:
+    elif args.data == 'synthetic':
         # dataset generation
         n_instances = args.instances
         # Seed are set inside generateDataset function
         full_dataset  = generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=env, H=H, seed=seed)
         single_trajectory = False
+    else:
+        raise NotImplementedError
 
 
     train_dataset = full_dataset[:int(n_instances*0.7)]
@@ -83,8 +86,12 @@ if __name__ == '__main__':
 
     # model initialization
     model = ANN(n_states=n_states)
+    model.build((None, train_dataset[0][0].shape[1]))
     optimizer = tf.keras.optimizers.Adam(learning_rate=0.01)
     loss_fn = tf.keras.losses.mean_squared_error
+
+    # Model list (visualization only)
+    model_list = []
 
     # training
     training_mode = 'two-stage' if args.method == 'TS' else 'decision-focused'
@@ -93,6 +100,7 @@ if __name__ == '__main__':
     overall_ope = {'train': [], 'test': [], 'val': []} # OPE IS
     overall_ope_sim = {'train': [], 'test': [], 'val': []} # OPE simulation
     for epoch in range(total_epoch+1):
+        model_list.append(model.get_weights())
         for mode, dataset in dataset_list:
             loss_list = []
             ope_list = [] # OPE IS
@@ -170,7 +178,15 @@ if __name__ == '__main__':
             overall_ope[mode].append(np.mean(ope_list))
             overall_ope_sim[mode].append(np.mean(ope_sim_list))
 
-    
+    folder_path = 'pretrained/{}'.format(args.data)
+
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
+
+    model_path = '{}/{}.pickle'.format(folder_path, args.method)
+    with open(model_path, 'wb') as f:
+        pickle.dump((train_dataset, val_dataset, test_dataset, model_list), f)
+
     if not(args.sv == '.'):
         ### Output to be saved, else do nothing. 
         with open(args.sv, 'wb') as filename:

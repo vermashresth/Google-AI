@@ -102,7 +102,7 @@ def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K
             total_probs = IS_weights[:,t,:] * total_probs # shape: [n_trials, n_benefs]
             IS_sum = tf.reduce_sum(total_probs, axis=0) # shape: [1, n_benefs]
             IS_square_sum = tf.reduce_sum(total_probs**2, axis=0) #/ n_benefs # shape: [1, n_benefs]
-            ope += rewards * total_probs * gamma_series[t] # / IS_sum
+            ope += rewards * total_probs * gamma_series[t] / IS_sum
             ess += IS_sum ** 2 / IS_square_sum # shape: [1, n_benefs]
         else:
             rewards = reward_record[:, 0, t, :]

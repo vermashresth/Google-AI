@@ -130,7 +130,7 @@ class DiffTopK(object):
     Based on the paper: https://proceedings.neurips.cc/paper/2020/file/ec24a54d62ce57ba93a531b460fa8d18-Paper.pdf
     """
 
-    def __init__(self, k, epsilon=0.1, max_iter=100):
+    def __init__(self, k, epsilon=0.5, max_iter=100):
         """Construct a Top-k Layer
         Args:v 
           k: 

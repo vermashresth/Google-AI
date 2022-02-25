@@ -41,7 +41,7 @@ def generateDataset(n_benefs, n_states, n_instances, n_trials, L, K, gamma, env=
     for i in range(n_instances):
         # Generate rewards from uniform distribution
         R = np.arange(n_states) # sorted(np.random.uniform(size=n_states))
-        R = (R - np.min(R)) / np.ptp(R) # normalize rewards
+        R = (R - np.min(R)) / np.ptp(R) * 2 - 1 # normalize rewards to between [-1,1]
         raw_R_data = np.repeat(R.reshape(1,-1), n_benefs, axis=0) # using the same rewards across all arms (for simplicity)
 
         # Generate transition probabilities
