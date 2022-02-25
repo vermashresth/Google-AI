@@ -27,7 +27,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import mean_squared_error
 from sklearn import preprocessing
-
+import lightgbm as lgb # Do conda install lightgbm
 
 from training.modelling.metrics import F1, Precision, Recall, BinaryAccuracy
 from tensorflow.keras.models import load_model
@@ -150,7 +150,10 @@ def get_individual_transition_clusters(train_beneficiaries, train_transitions, f
     train_beneficiaries['cluster'] = train_labels
     # test_beneficiaries['cluster'] = cls.predict(test_static_features)
 
+    # Review: changed classifier from random forest to lightgbm
     dt_clf = RandomForestClassifier(n_estimators=200, criterion="entropy", max_depth=30, n_jobs=-1, random_state=124)
+    dt_clf = lgb.LGBMClassifier(learning_rate=0.09,max_depth=-1,random_state=42)
+
     # REVIEW: Added Code for mapping methods
     if mapping_method=='FO':
         scaler = preprocessing.StandardScaler().fit(train_static_features)
@@ -378,10 +381,11 @@ def run_third_pilot(all_beneficiaries, transitions, call_data, CONFIG, features_
     pilot_dynamic_xs[:, :, 3] = pilot_dynamic_xs[:, :, 3] / 60
     pilot_dynamic_xs[:, :, 4] = pilot_dynamic_xs[:, :, 4] / 12
 
+    # Review: Do not subtract mean!!
     # static features preprocessing
     pilot_static_xs = pilot_static_xs.astype(np.float32)
-    pilot_static_xs[:, 0] = (pilot_static_xs[:, 0] - enroll_gest_age_mean)
-    pilot_static_xs[:, 6] = (pilot_static_xs[:, 6] - days_to_first_call_mean)
+    # pilot_static_xs[:, 0] = (pilot_static_xs[:, 0] - enroll_gest_age_mean)
+    # pilot_static_xs[:, 6] = (pilot_static_xs[:, 6] - days_to_first_call_mean)
 
     dependencies = {
         'BinaryAccuracy': BinaryAccuracy,
