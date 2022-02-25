@@ -102,7 +102,7 @@ def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K
             total_probs = IS_weights[:,t,:] * total_probs # shape: [n_trials, n_benefs]
             IS_sum = tf.reduce_sum(total_probs, axis=0) # shape: [1, n_benefs]
             IS_square_sum = tf.reduce_sum(total_probs**2, axis=0) #/ n_benefs # shape: [1, n_benefs]
-            ope += rewards * total_probs * gamma_series[t] # / IS_sum
+            ope += rewards * total_probs * gamma_series[t] / IS_sum
             ess += IS_sum ** 2 / IS_square_sum # shape: [1, n_benefs]
         else:
             rewards = reward_record[:, 0, t, :]
@@ -111,10 +111,7 @@ def opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, T, K
             ope += rewards * IS_weights[:,t,:] / IS_sum * gamma_series[t]
             ess += IS_sum ** 2 / IS_square_sum
 
-    if single_trajectory:
-        ope = tf.reduce_sum(ope)
-    else:
-        ope = tf.reduce_mean(tf.reduce_sum(ope, axis=1))
+    ope = tf.reduce_sum(ope)
     return ope, ess
 
 def opeISNaive(traj, w, n_benefs, T, K, n_trials, gamma, target_policy_name, beh_policy_name):
