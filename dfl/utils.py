@@ -130,7 +130,7 @@ class DiffTopK(object):
     Based on the paper: https://proceedings.neurips.cc/paper/2020/file/ec24a54d62ce57ba93a531b460fa8d18-Paper.pdf
     """
 
-    def __init__(self, k, epsilon=0.5, max_iter=100):
+    def __init__(self, k, epsilon=0.1, max_iter=100):
         """Construct a Top-k Layer
         Args:v 
           k: 
@@ -242,11 +242,11 @@ class DiffTopK(object):
 
         return tf.stop_gradient(Gamma), gradient_function
 
-def getSoftTopk(a, k):
+def getSoftTopk(a, k, epsilon=0.1):
     bs, n = a.shape
-    diffTopK = DiffTopK(k=k)
-    gamma = diffTopK(-a)
-    probs = gamma[:,:,0].numpy() * n / k
+    diffTopK = DiffTopK(k=k, epsilon=epsilon)
+    gamma = diffTopK(-a).numpy()
+    probs = gamma[:,:,0] / np.sum(gamma[:,:,0], axis=1, keepdims=True)
 
     selection = []
     for i in range(bs):

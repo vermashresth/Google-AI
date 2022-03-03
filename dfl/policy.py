@@ -11,7 +11,7 @@ from dfl.whittle import whittleIndex
 WHITTLE_EPS = 1e-2
 
 # Review: for now, getActions is in both environment.py and here
-def getActions(states, policy, ts, w, k):
+def getActions(states, policy, ts, w, k, epsilon=0.1):
     N = len(states)
     actions=np.zeros(N)
     if policy == 0:
@@ -35,12 +35,12 @@ def getActions(states, policy, ts, w, k):
         whittle_indices = w[np.arange(N), states]
         whittle_indices = tf.convert_to_tensor([whittle_indices], dtype=tf.float32)
 
-        soft_top_k_whittle=getSoftTopk(whittle_indices, k)
+        soft_top_k_whittle=getSoftTopk(whittle_indices, k, epsilon=epsilon)
         actions[soft_top_k_whittle] = 1
 
     return actions.astype('int64')
 
-def getSoftActions(states, policy, ts, w, k):
+def getSoftActions(states, policy, ts, w, k, epsilon=0.1):
     # policy 3: soft whittle index
     # This function supports batch access
     # select k arms by Whittle using soft top k
@@ -49,7 +49,7 @@ def getSoftActions(states, policy, ts, w, k):
     whittle_indices = [w[np.arange(N), states[tr]] for tr in range(ntr)]
     whittle_indices = tf.convert_to_tensor(whittle_indices, dtype=tf.float32)
 
-    soft_top_k_whittle = getSoftTopk(whittle_indices, k)
+    soft_top_k_whittle = getSoftTopk(whittle_indices, k, epsilon=epsilon)
     for tr in range(ntr):
         actions[tr, soft_top_k_whittle[tr]] = 1
 
@@ -165,7 +165,7 @@ def getActionProbRandom(states, action, k, N):
         return 1-k/N
 
 # Batch version
-def getProbs(states, policy, ts, w, k):
+def getProbs(states, policy, ts, w, k, epsilon=0.1):
     bs, N = states.shape
     if policy == 0:
         probs = tf.ones((bs, N)) * k / N
@@ -206,7 +206,7 @@ def getProbs(states, policy, ts, w, k):
         w_selected = tf.gather_nd(w, states_with_indices)
         # print('whittle shape', w_selected.shape) # [bs, N]
 
-        diffTopK = DiffTopK(k=k)
+        diffTopK = DiffTopK(k=k, epsilon=epsilon)
         gamma = diffTopK(-w_selected)
         probs = gamma[:,:,0] * N
 
