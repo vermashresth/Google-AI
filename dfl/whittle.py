@@ -51,8 +51,11 @@ def newWhittleIndex(P, R, gamma=0.99):
     tmp_P = tmp_P.numpy().reshape(1, N, n_states, n_actions, n_states).repeat(n_wh_states, axis=0)
 
     # initialize upper and lower bounds for binary search
-    w_ub = np.ones((n_wh_states, N))  # Whittle index upper bound
-    w_lb = -np.ones((n_wh_states, N)) # Whittle index lower bound
+    whittle_max = 2
+    whittle_min = -2
+
+    w_ub = np.ones((n_wh_states, N)) * whittle_max # Whittle index upper bound
+    w_lb = np.ones((n_wh_states, N)) * whittle_min # Whittle index lower bound
     w = (w_ub + w_lb) / 2
 
     n_binary_search_iters = 10 # Using a fixed # of iterations or a tolerance rate instead
@@ -103,8 +106,7 @@ def newWhittleIndex(P, R, gamma=0.99):
         w_ub = w_ub - (w_ub - w_lb) / 2 * comparison
         w_lb = w_lb + (w_ub - w_lb) / 2 * (1 - comparison)
 
-    
-    
+    w = (w_ub + w_lb) / 2
 
     # For every wh_state, arm note which action gives the max Q over all MDP states
     action_max_Q = np.argmax(Q, axis=3) # vector of shape n_wh_states x N
@@ -213,6 +215,9 @@ def newWhittleIndex(P, R, gamma=0.99):
     # Solve batch of linear equations
     solution = tf.linalg.solve(lhs, rhs) # matrix of shape N, m+1
     w_solution = solution[:, :, :1, 0] # vector of shape n_wh_states x N x 1
+
+    # Clip the Whittle indices that exceed the whittle max and min
+    w_solution = tf.clip_by_value(w_solution, whittle_min, whittle_max)
 
     # Transpose to get vector of shape N x n_wh_states x 1
     return tf.transpose(w_solution, [1, 0, 2])

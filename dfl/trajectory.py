@@ -12,7 +12,7 @@ from dfl.priors import clustered_prior
 
 from collections import defaultdict
 
-def simulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[0]):
+def simulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[0], epsilon=0.1):
 
     ##### Unpack arguments
     L=args['simulation_length']
@@ -84,7 +84,7 @@ def simulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[0])
   
     return simulated_rewards, state_record, action_record, reward_record, traj
 
-def fastSimulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[3]):
+def fastSimulateTrajectories(args, env, k, w, gamma, start_state=None, policies=[3], epsilon=0.1):
     # Parallel implementation of simulation
 
     ##### Unpack arguments
@@ -126,7 +126,7 @@ def fastSimulateTrajectories(args, env, k, w, gamma, start_state=None, policies=
             traj[:, pol_idx, timestep, dim_dict['state'], :] = np.copy(states)
 
             ## Get Actions
-            actions = getSoftActions(states=states, policy=pol, ts=timestep, w=w, k=k)
+            actions = getSoftActions(states=states, policy=pol, ts=timestep, w=w, k=k, epsilon=epsilon)
             action_record[:, pol_idx, timestep, :] = np.copy(actions)
             traj[:, pol_idx, timestep, dim_dict['action'], :] = np.copy(actions)
 
@@ -156,7 +156,7 @@ def fastSimulateTrajectories(args, env, k, w, gamma, start_state=None, policies=
     
     return simulated_rewards, state_record, action_record, reward_record, traj
 
-def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1,
+def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma = 1, epsilon=0.1,
                              T_data=None, R_data=None, w=None, start_state=None, H=10, debug=False, replace=False,
                              policies=[0], fast=False):
 
@@ -182,9 +182,9 @@ def getSimulatedTrajectories(n_benefs = 10, T = 5, K = 3, n_trials = 10, gamma =
 
     # Run simulation
     if fast: # This only supports policy_id = 3
-        simulated_rewards, state_record, action_record, reward_record, traj = fastSimulateTrajectories(args=args, env=env, k=K, w=w, gamma=gamma, start_state=start_state, policies=policies)
+        simulated_rewards, state_record, action_record, reward_record, traj = fastSimulateTrajectories(args=args, env=env, k=K, w=w, gamma=gamma, start_state=start_state, policies=policies, epsilon=epsilon)
     else:
-        simulated_rewards, state_record, action_record, reward_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w, gamma=gamma, start_state=start_state, policies=policies)
+        simulated_rewards, state_record, action_record, reward_record, traj = simulateTrajectories(args=args, env=env, k=K, w=w, gamma=gamma, start_state=start_state, policies=policies, epsilon=epsilon)
 
     if debug:
         print('trajectory shape: ', np.array(traj).shape) 
@@ -438,7 +438,7 @@ def getEmpTransitionMatrix(traj, policy_id, n_benefs, m, env='general', H=None, 
                 s_a = transitions_df[(transitions_df['s']==s) &
                                         (transitions_df['a']==a)
                                     ]
-                s_a_count = s_a.shape[0]
+                s_a_count = s_a.shape[0] # len(s_a)
                 for s_prime in range(n_states):
                     s_a_s_prime = s_a[(s_a['s_prime']==s_prime)
                                                 ]
