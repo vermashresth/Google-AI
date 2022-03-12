@@ -169,7 +169,7 @@ if __name__ == '__main__':
                     # print('Whittle index time:', time.time() - start_time)
                     
                     # start_time = time.time()
-                    evaluation_epsilon = 0.1 if mode == 'train' else 0.01
+                    evaluation_epsilon = 1.0 / 10 if mode == 'train' else 0.01
                     ope_IS, ess = opeIS_parallel(state_record, action_record, reward_record, w, n_benefs, L, K, n_trials, gamma,
                             target_policy_name, beh_policy_name, single_trajectory=single_trajectory, epsilon=evaluation_epsilon)
                     ope_sim = ope_simulator(w, K, epsilon=evaluation_epsilon)

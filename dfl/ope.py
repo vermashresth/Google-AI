@@ -197,18 +197,19 @@ class opeSimulator(object):
         average_reward = tf.reduce_mean(tf.convert_to_tensor(simulated_rewards, dtype=tf.float32))
 
         def gradient_function(dsoln):
-            gamma_list = np.repeat(np.reshape(self.gamma ** np.arange(self.T), (1,1,self.T,1)), repeats=self.OPE_sim_n_trials, axis=0)
+            gamma_list = np.reshape(self.gamma ** np.arange(self.T), (1,1,self.T,1))
             discounted_reward_record = reward_record * gamma_list
             cumulative_rewards = tf.math.cumsum(tf.convert_to_tensor(discounted_reward_record, dtype=tf.float32), axis=2, reverse=True)
             with tf.GradientTape() as tmp_tape:
                 tmp_tape.watch(w)
-                probs_raw = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K), (self.OPE_sim_n_trials, self.T, self.n_benefs))
+                probs_raw = tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K, epsilon=self.epsilon), (self.OPE_sim_n_trials, self.T, self.n_benefs))
                 selected_probs = probs_raw * action_record[:,0,:,:] + (1 - probs_raw) * (1 - action_record[:,0,:,:]) # [ntr, 1, self.T, n_benefs]
 
                 # tf.reshape(getProbs(state_record[:,0,:,:].reshape(-1, self.n_benefs), policy=3, ts=None, w=w, k=self.K), (-1, 1, self.T, self.n_benefs))
                 selected_logprobs = tf.math.log(selected_probs)
                 
-                total_reward = tf.reduce_mean(tf.reduce_sum(cumulative_rewards[:,0,:,:] * selected_logprobs, axis=(1,2)))
+                # total_reward = tf.reduce_mean(tf.reduce_sum(cumulative_rewards[:,0,-1,:] * selected_logprobs[:,-1,:], axis=(-1)))
+                total_reward = tf.reduce_mean(tf.reduce_sum(cumulative_rewards[:,0,:,:] * selected_logprobs[:,:,:], axis=(-1)))
 
             dtotal_dw = tmp_tape.gradient(total_reward, w)
             del tmp_tape
