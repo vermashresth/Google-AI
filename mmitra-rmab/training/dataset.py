@@ -31,7 +31,7 @@ def _days_to_first_call(row):
 def _calc_days_to_first_call(data, call_data):
     call_data = call_data[["user_id", "startdate", "callStatus"]]
     first_call_dates = (
-        call_data[call_data["callStatus"] == 0].groupby("user_id")["startdate"].min()
+        call_data.groupby("user_id")["startdate"].min()
     )
     data = pd.merge(data, first_call_dates, "left", left_on="user_id", right_index=True)
     data["days_to_first_call"] = data.swifter.progress_bar(False).apply(
